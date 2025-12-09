@@ -8,7 +8,7 @@ export const playerCell = {
     maxRadius: 28,       // Størrelse ved deling (ca. dobbelt areal)
     color: '#4CAF50',
     pulse: 0,
-    speed: 0.4, 
+    speed: 0.8, 
     currentRadius: 20,
 
     atp: 100,         
@@ -18,7 +18,7 @@ export const playerCell = {
     alive: true,
 
     aminoAcids: 0,
-    maxAminoAcids: 50 
+    maxAminoAcids: 10 
 };
 
 export function initPlayer(canvasWidth, canvasHeight) {
