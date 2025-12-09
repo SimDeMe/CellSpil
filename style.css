@@ -1,0 +1,13 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Fjerner scrollbars */
+    background-color: #0d1117; /* Mørk dybhavs-farve */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+canvas {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+}
