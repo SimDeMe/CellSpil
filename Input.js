@@ -1,31 +1,35 @@
 export const mouse = {
     x: 0,
-    y: 0
+    y: 0,
+    clicked: false
 };
 
-// Vi gemmer status for taster
+// Vi gemmer kun taster, der skal holdes nede eller tjekkes i gameloopet
 export const keys = {
-    space: false
+    d: false  // NYT: Vi lytter efter D
 };
 
 export function initInput() {
-    // Musens bevægelse
-    window.addEventListener('mousemove', (event) => {
-        mouse.x = event.clientX;
-        mouse.y = event.clientY;
+    // Mus
+    window.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
     });
 
-    // Når en tast trykkes NED
-    window.addEventListener('keydown', (event) => {
-        if (event.code === 'Space') {
-            keys.space = true;
-        }
+    window.addEventListener('mousedown', () => {
+        mouse.clicked = true;
     });
 
-    // Når en tast slippes OP
-    window.addEventListener('keyup', (event) => {
-        if (event.code === 'Space') {
-            keys.space = false;
-        }
+    window.addEventListener('mouseup', () => {
+        mouse.clicked = false;
+    });
+
+    // Tastatur - Holdes nede
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyD') keys.d = true; // Hvis man trykker D
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyD') keys.d = false;
     });
 }

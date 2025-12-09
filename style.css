@@ -1,13 +1,30 @@
 body {
     margin: 0;
-    overflow: hidden; /* Fjerner scrollbars */
-    background-color: #0d1117; /* Mørk dybhavs-farve */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    overflow: hidden;
+    background-color: #0d1117;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-canvas {
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+#ui-layer {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 10px;
+    z-index: 10; /* Sørg for at de ligger over canvas */
+}
+
+button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 4px;
+    backdrop-filter: blur(5px);
+}
+
+button:hover {
+    background: rgba(255, 255, 255, 0.3);
 }

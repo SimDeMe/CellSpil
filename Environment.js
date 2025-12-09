@@ -1,12 +1,16 @@
+import { Cell } from './Cell.js'; // Importer klassen
+
 export const foodParticles = [];
-// NYT: Liste til andre celler (NPC'er)
 export const otherCells = []; 
 
+// Konfiguration
 const maxFood = 150; 
-const spawnRate = 40; 
 let spawnTimer = 0;
 
 export function initEnvironment(canvasWidth, canvasHeight) {
+    foodParticles.length = 0; // Tøm listerne ved reset
+    otherCells.length = 0;
+
     for (let i = 0; i < 50; i++) {
         spawnFood(canvasWidth, canvasHeight);
     }
@@ -14,29 +18,49 @@ export function initEnvironment(canvasWidth, canvasHeight) {
 
 export function updateEnvironment(canvasWidth, canvasHeight) {
     spawnTimer++;
-    if (spawnTimer > spawnRate && foodParticles.length < maxFood) {
+    if (spawnTimer > 40 && foodParticles.length < maxFood) {
         spawnFood(canvasWidth, canvasHeight);
         spawnTimer = 0; 
     }
 
-    // NYT: Opdater også søster-cellerne (få dem til at flyde lidt)
+    // Opdater alle NPC celler (De har nu deres egen update metode!)
     otherCells.forEach(cell => {
-        cell.x += (Math.random() - 0.5) * 0.5; // Brownske bevægelser
-        cell.y += (Math.random() - 0.5) * 0.5;
-        // Simpel animation af deres form
-        cell.pulse += 0.05;
+        cell.update(null, null); // Ingen mus/keys til NPC'er
     });
 }
 
-// NYT: Funktion til at skabe en søster-celle
-export function spawnSisterCell(x, y, radius, color) {
-    otherCells.push({
-        x: x,
-        y: y,
-        radius: radius, // De starter store (halvdelen af moderen, men vi snyder lidt visuelt)
-        color: color,
-        pulse: Math.random() * 10 // Start animation et tilfældigt sted
-    });
+// Nu bruger vi Cell klassen til at lave søstre
+export function spawnSisterCell(x, y) {
+    const sister = new Cell(x, y, false);
+    sister.radius = 20; // Start lille
+    otherCells.push(sister);
+}
+
+// Tjek om vi klikker på en celle for at skifte til den
+export function getCellAtPosition(mouseX, mouseY) {
+    for (let cell of otherCells) {
+        const dx = cell.x - mouseX;
+        const dy = cell.y - mouseY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        // Hvis vi klikker på den, og den er i live
+        if (dist < cell.radius && cell.alive) {
+            return cell;
+        }
+    }
+    return null;
+}
+
+// Hjælpefunktion til at flytte en celle fra NPC-listen til Player-status
+export function removeCellFromEnvironment(cellToRemove) {
+    const index = otherCells.indexOf(cellToRemove);
+    if (index > -1) {
+        otherCells.splice(index, 1);
+    }
+}
+
+export function addCellToEnvironment(cellToAdd) {
+    otherCells.push(cellToAdd);
 }
 
 function spawnFood(width, height) {
@@ -44,11 +68,10 @@ function spawnFood(width, height) {
     let particle = {
         x: Math.random() * width,
         y: Math.random() * height,
-        type: 'glucose', 
+        type: 'glucose',
         radius: 3,
-        color: '#FFEB3B' 
+        color: '#FFEB3B'
     };
-
     if (typeRandom > 0.8) {
         particle.type = 'amino';
         particle.color = '#2196F3'; 
@@ -58,53 +81,37 @@ function spawnFood(width, height) {
 }
 
 export function drawEnvironment(ctx) {
-    // 1. Tegn Mad
+    // Tegn Mad
     foodParticles.forEach(food => {
         ctx.beginPath();
-        if (food.type === 'glucose') {
-            ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
-        } else {
-            ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
-        }
+        if (food.type === 'glucose') ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
+        else ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
         ctx.fillStyle = food.color;
         ctx.fill();
-        ctx.closePath();
     });
 
-    // 2. NYT: Tegn Søster-celler
+    // Tegn NPC Celler
     otherCells.forEach(cell => {
-        // Beregn pulserende størrelse
-        const r = cell.radius + Math.sin(cell.pulse) * 2;
-        
-        ctx.beginPath();
-        ctx.arc(cell.x, cell.y, r, 0, Math.PI * 2);
-        ctx.fillStyle = '#888'; // Gør dem grå for at vise de er "NPC'er"
-        ctx.fill();
-        ctx.strokeStyle = '#555';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.closePath();
+        cell.draw(ctx);
     });
 }
 
-export function checkCollisions(player) {
-    if (!player.alive) return;
+// Nu tjekker vi kollision for en hvilken som helst celle
+export function checkCollisions(cell) {
+    if (!cell.alive) return;
 
     for (let i = foodParticles.length - 1; i >= 0; i--) {
         const food = foodParticles[i];
-        const dx = player.x - food.x;
-        const dy = player.y - food.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const dx = cell.x - food.x;
+        const dy = cell.y - food.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance < player.currentRadius + food.radius) {
+        if (dist < cell.radius + food.radius) {
             foodParticles.splice(i, 1);
-            
             if (food.type === 'glucose') {
-                player.atp += 20; 
-                if (player.atp > player.maxAtp) player.atp = player.maxAtp;
+                cell.atp = Math.min(cell.atp + 20, cell.maxAtp);
             } else if (food.type === 'amino') {
-                player.aminoAcids += 1;
-                if (player.aminoAcids > player.maxAminoAcids) player.aminoAcids = player.maxAminoAcids;
+                cell.aminoAcids = Math.min(cell.aminoAcids + 1, cell.maxAminoAcids);
             }
         }
     }
