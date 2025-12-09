@@ -4,10 +4,12 @@ export const mouse = {
     clicked: false
 };
 
-// Vi gemmer kun taster, der skal holdes nede eller tjekkes i gameloopet
 export const keys = {
-    d: false  // NYT: Vi lytter efter D
+    d: false,  // Deling
+    i: false   // NYT: Inspektion
 };
+
+
 
 export function initInput() {
     // Mus

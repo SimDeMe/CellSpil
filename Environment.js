@@ -1,14 +1,13 @@
-import { Cell } from './Cell.js'; // Importer klassen
+import { Cell } from './Cell.js'; 
 
 export const foodParticles = [];
 export const otherCells = []; 
 
-// Konfiguration
 const maxFood = 150; 
 let spawnTimer = 0;
 
 export function initEnvironment(canvasWidth, canvasHeight) {
-    foodParticles.length = 0; // Tøm listerne ved reset
+    foodParticles.length = 0; 
     otherCells.length = 0;
 
     for (let i = 0; i < 50; i++) {
@@ -23,27 +22,25 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
         spawnTimer = 0; 
     }
 
-    // Opdater alle NPC celler (De har nu deres egen update metode!)
     otherCells.forEach(cell => {
-        cell.update(null, null); // Ingen mus/keys til NPC'er
+        // Her opdaterer vi NPC'erne
+        cell.update(null, null, canvasWidth, canvasHeight);
     });
 }
 
-// Nu bruger vi Cell klassen til at lave søstre
 export function spawnSisterCell(x, y) {
     const sister = new Cell(x, y, false);
-    sister.radius = 20; // Start lille
+    sister.radius = 20; 
     otherCells.push(sister);
 }
 
-// Tjek om vi klikker på en celle for at skifte til den
 export function getCellAtPosition(mouseX, mouseY) {
     for (let cell of otherCells) {
         const dx = cell.x - mouseX;
         const dy = cell.y - mouseY;
         const dist = Math.sqrt(dx*dx + dy*dy);
         
-        // Hvis vi klikker på den, og den er i live
+        // Returner cellen hvis vi rammer den og den lever
         if (dist < cell.radius && cell.alive) {
             return cell;
         }
@@ -51,7 +48,6 @@ export function getCellAtPosition(mouseX, mouseY) {
     return null;
 }
 
-// Hjælpefunktion til at flytte en celle fra NPC-listen til Player-status
 export function removeCellFromEnvironment(cellToRemove) {
     const index = otherCells.indexOf(cellToRemove);
     if (index > -1) {
@@ -81,7 +77,6 @@ function spawnFood(width, height) {
 }
 
 export function drawEnvironment(ctx) {
-    // Tegn Mad
     foodParticles.forEach(food => {
         ctx.beginPath();
         if (food.type === 'glucose') ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
@@ -90,13 +85,11 @@ export function drawEnvironment(ctx) {
         ctx.fill();
     });
 
-    // Tegn NPC Celler
     otherCells.forEach(cell => {
         cell.draw(ctx);
     });
 }
 
-// Nu tjekker vi kollision for en hvilken som helst celle
 export function checkCollisions(cell) {
     if (!cell.alive) return;
 
