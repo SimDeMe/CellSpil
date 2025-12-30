@@ -3,14 +3,14 @@ import { Cell } from './Cell.js';
 export const foodParticles = [];
 export const otherCells = [];
 
-const maxFood = 150;
+const maxFood = 1500;
 let spawnTimer = 0;
 
 export function initEnvironment(canvasWidth, canvasHeight) {
     foodParticles.length = 0;
     otherCells.length = 0;
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 500; i++) {
         spawnFood(canvasWidth, canvasHeight);
     }
 }
@@ -76,6 +76,9 @@ export function spawnSisterCell(x, y, motherGenes = null) {
             console.log("MUTATION! Ny gen: " + newMutation);
         }
     }
+
+    // VIGTIGT: Opdater max amino krav efter gener er ændret
+    sister.updateMaxGrowth();
 
     otherCells.push(sister);
 }

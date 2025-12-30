@@ -6,7 +6,9 @@ export const mouse = {
 
 export const keys = {
     d: false,  // Deling
-    i: false   // NYT: Inspektion
+    i: false,  // Inspektion
+    s: false,  // Cheat
+    m: false   // Cheat
 };
 
 
@@ -28,10 +30,14 @@ export function initInput() {
 
     // Tastatur - Holdes nede
     window.addEventListener('keydown', (e) => {
-        if (e.code === 'KeyD') keys.d = true; // Hvis man trykker D
+        if (e.code === 'KeyD') keys.d = true;
+        if (e.code === 'KeyS') keys.s = true;
+        if (e.code === 'KeyM') keys.m = true;
     });
 
     window.addEventListener('keyup', (e) => {
         if (e.code === 'KeyD') keys.d = false;
+        if (e.code === 'KeyS') keys.s = false;
+        if (e.code === 'KeyM') keys.m = false;
     });
 }

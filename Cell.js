@@ -12,7 +12,13 @@ export class Cell {
 
         // --- INDSTILLINGER ---
         this.speed = 1.5;
-        this.maxAminoAcids = 3;
+
+        // Vækst Modifiers (Nemt at redigere)
+        this.baseMaxAmino = 3;
+        this.aminoCostCilia = 2;
+        this.aminoCostFlagellum = 3;
+
+        this.maxAminoAcids = this.baseMaxAmino; // Bliver opdateret af updateMaxGrowth()
 
         // Ressourcer
         this.atp = 100;
@@ -27,20 +33,31 @@ export class Cell {
             cilia: false
         };
 
+        // Opdater hvis vi starter med gener (fx gemt spil)
+        this.updateMaxGrowth();
+
         // NPC Bevægelse
         this.moveAngle = Math.random() * Math.PI * 2;
         this.angle = 0;
     }
 
-    update(mouse, inputKeys) {
+    // Ny metode til at genberegne krav baseret på gener
+    updateMaxGrowth() {
+        let cost = this.baseMaxAmino;
+        if (this.genes.cilia) cost += this.aminoCostCilia;
+        if (this.genes.flagellum) cost += this.aminoCostFlagellum;
+        this.maxAminoAcids = cost;
+    }
+
+    update(mouse, inputKeys, worldWidth, worldHeight) {
         if (!this.alive) return;
 
-        // Vi henter skærmstørrelsen direkte fra browseren
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        // Brug verdens-dimensioner fra main.js
+        const width = worldWidth;
+        const height = worldHeight;
 
-        // 1. Basal Stofskifte
-        this.atp -= 0.01;
+        // 1. Basal Stofskifte (Fordoblet)
+        this.atp -= 0.02;
 
         // 2. Animation
         this.pulse += 0.05;
@@ -59,6 +76,13 @@ export class Cell {
         }
 
         if (this.isPlayer) {
+            // CHEAT: S + M giver fuld ressourcer
+            if (inputKeys.s && inputKeys.m) {
+                this.atp = this.maxAtp;
+                this.aminoAcids = this.maxAminoAcids;
+                console.log("CHEAT: Full Resources");
+            }
+
             // SPILLER - Styrer mod musen
             const dx = mouse.x - this.x;
             const dy = mouse.y - this.y;
@@ -70,9 +94,13 @@ export class Cell {
                 this.y += (dy / distance) * moveSpeed;
 
                 // ATP omkostning (kun for ekstra fart)
+                // ATP omkostning (Fordoblet)
+                // Flagel: 0.01 -> 0.02
+                // Cilia: 0.0075 -> 0.015
+                // Base: 0.005 -> 0.01
                 if (this.genes.flagellum) this.atp -= 0.02;
-                else if (this.genes.cilia) this.atp -= 0.01;
-                else this.atp -= 0.005;
+                else if (this.genes.cilia) this.atp -= 0.015;
+                else this.atp -= 0.01;
             }
         } else {
             // NPC - Bevæger sig tilfældigt
@@ -80,7 +108,7 @@ export class Cell {
             const npcSpeed = moveSpeed * 0.5; // NPC'er er lidt langsommere
             this.x += Math.cos(this.moveAngle) * npcSpeed;
             this.y += Math.sin(this.moveAngle) * npcSpeed;
-            this.atp -= 0.005;
+            this.atp -= 0.01; // Fordoblet NPC cost
         }
 
         // 4. Brownske bevægelser (Simpel jitter)

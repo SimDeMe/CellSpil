@@ -1,16 +1,27 @@
 import { initInput, mouse, keys } from './Input.js';
 import { activeCell, initPlayer, setActiveCell } from './Player.js';
-import { 
-    initEnvironment, updateEnvironment, drawEnvironment, 
-    checkCollisions, spawnSisterCell, otherCells, 
-    getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment 
-} from './Environment.js'; 
+import {
+    initEnvironment, updateEnvironment, drawEnvironment,
+    checkCollisions, spawnSisterCell, otherCells,
+    getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment
+} from './Environment.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
+
+// --- VERDEN & KAMERA ---
+const worldWidth = 5000;
+const worldHeight = 5000;
+
+const camera = {
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: canvas.height
+};
 
 let isPaused = false;
 let isInspecting = false;
@@ -21,7 +32,7 @@ try {
     document.getElementById('pauseBtn').addEventListener('click', togglePause);
     document.getElementById('resetBtn').addEventListener('click', resetGame);
     document.getElementById('apoBtn').addEventListener('click', triggerApoptosis);
-    document.getElementById('inspectBtn').addEventListener('click', toggleInspect); 
+    document.getElementById('inspectBtn').addEventListener('click', toggleInspect);
 } catch (e) {
     console.error("Kunne ikke finde knapperne. Husk at gemme index.html!");
 }
@@ -43,17 +54,17 @@ function togglePause() {
     isPaused = !isPaused;
     // Hvis vi starter spillet igen, skal inspektionsvinduet lukkes
     if (!isPaused) {
-        isInspecting = false; 
+        isInspecting = false;
     }
     const btn = document.getElementById('pauseBtn');
-    if(btn) btn.innerText = isPaused ? "▶ START" : "⏸ PAUSE";
+    if (btn) btn.innerText = isPaused ? "▶ START" : "⏸ PAUSE";
 }
 
 function toggleInspect() {
     // Man kan kun inspicere, hvis spillet er pauset
     if (!isPaused && !isInspecting) {
         // Vi pauser automatisk
-        togglePause(); 
+        togglePause();
     }
     isInspecting = !isInspecting;
     console.log("Inspektion: " + isInspecting);
@@ -64,8 +75,8 @@ function resetGame() {
     isPaused = false;
     isInspecting = false;
     const btn = document.getElementById('pauseBtn');
-    if(btn) btn.innerText = "⏸ PAUSE";
-    init(); 
+    if (btn) btn.innerText = "⏸ PAUSE";
+    init();
 }
 
 function triggerApoptosis() {
@@ -78,21 +89,26 @@ function triggerApoptosis() {
 // Første gang spillet starter
 function init() {
     initInput();
-    initPlayer(canvas.width, canvas.height);
-    initEnvironment(canvas.width, canvas.height);
+    // Vi initialiserer spilleren i midten af den store verden
+    initPlayer(worldWidth, worldHeight);
+    initEnvironment(worldWidth, worldHeight);
 }
 
 function handleCellSwitch() {
+    // Konverter musens skærm-koordinater til verdens-koordinater
+    const mouseWorldX = mouse.x + camera.x;
+    const mouseWorldY = mouse.y + camera.y;
+
     if (mouse.clicked) {
-        const clickedCell = getCellAtPosition(mouse.x, mouse.y);
-        
+        const clickedCell = getCellAtPosition(mouseWorldX, mouseWorldY);
+
         if (clickedCell) {
             const oldPlayer = activeCell;
             addCellToEnvironment(oldPlayer);
             removeCellFromEnvironment(clickedCell);
             setActiveCell(clickedCell);
-            
-            mouse.clicked = false; 
+
+            mouse.clicked = false;
         }
     }
 }
@@ -100,20 +116,69 @@ function handleCellSwitch() {
 function handleDivision() {
     if (keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
         spawnSisterCell(activeCell.x, activeCell.y, activeCell.genes);
-        
-        activeCell.aminoAcids = 0; 
-        activeCell.radius = activeCell.minRadius; 
-        activeCell.x += 30; 
-        
+
+        activeCell.aminoAcids = 0;
+        activeCell.radius = activeCell.minRadius;
+        activeCell.x += 30;
+
         generation++;
     }
+}
+
+// --- MINIMAP FUNKTION ---
+function drawMinimap() {
+    const mapSize = 200; // Pixel størrelse på skærmen
+    const scale = mapSize / Math.max(worldWidth, worldHeight);
+
+    const margin = 20;
+    const mapX = canvas.width - mapSize - margin;
+    const mapY = canvas.height - mapSize - margin;
+
+    // 1. Baggrund
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(mapX, mapY, mapSize, mapSize);
+
+    // 2. Kant
+    ctx.strokeStyle = '#FFF';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+
+    // 3. Andre celler
+    ctx.fillStyle = '#FF5252'; // Rødlig for fjender/NPC
+    otherCells.forEach(cell => {
+        const cx = mapX + cell.x * scale;
+        const cy = mapY + cell.y * scale;
+        // Tegn kun hvis indenfor kortet (burde de altid være)
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // 4. Spilleren
+    if (activeCell) {
+        ctx.fillStyle = '#69F0AE'; // Grøn
+        const px = mapX + activeCell.x * scale;
+        const py = mapY + activeCell.y * scale;
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // 5. Kamera Viewport (Hvid firkant)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 1;
+    const camRectX = mapX + camera.x * scale;
+    const camRectY = mapY + camera.y * scale;
+    const camRectW = camera.width * scale;
+    const camRectH = camera.height * scale;
+    ctx.strokeRect(camRectX, camRectY, camRectW, camRectH);
 }
 
 // --- NY FUNKTION: Tegn Inspektion (RENSES FOR BILLEDE-TAGS) ---
 function drawInspectorWindow(cell) {
     // Sørg for at alt fryser i inspektionsmode
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height); // Tegn overlay på skærmen (ikke verden)
 
     const winWidth = 600;
     const winHeight = 500;
@@ -130,7 +195,7 @@ function drawInspectorWindow(cell) {
     ctx.fillStyle = 'white';
     ctx.font = '24px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText("🔬 DNA ANALYSE & MUTATIONER", winX + winWidth/2, winY + 40);
+    ctx.fillText("🔬 DNA ANALYSE & MUTATIONER", winX + winWidth / 2, winY + 40);
 
     // --- DNA CIRKEL ---
     const circleX = winX + winWidth / 2;
@@ -146,7 +211,7 @@ function drawInspectorWindow(cell) {
     // Pynt på DNA
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'rgba(255, 64, 129, 0.5)';
-    for(let i = 0; i < 20; i++) {
+    for (let i = 0; i < 20; i++) {
         const angle = (Math.PI * 2 / 20) * i;
         const innerR = circleR - 7;
         const outerR = circleR + 7;
@@ -211,12 +276,13 @@ function drawInspectorWindow(cell) {
 }
 
 function drawUI() {
-    // ... (Behold drawUI fra forrige besked) ...
+    // UI tegnes OVENPÅ alt (ingen camera transform her da vi resetter context før kald)
+
     // ATP Bar
     ctx.fillStyle = '#333';
     ctx.fillRect(20, canvas.height - 40, 200, 20);
     const atpWidth = (activeCell.atp / activeCell.maxAtp) * 200;
-    ctx.fillStyle = '#FFC107'; 
+    ctx.fillStyle = '#FFC107';
     ctx.fillRect(20, canvas.height - 40, atpWidth, 20);
     ctx.fillStyle = '#FFF';
     ctx.font = '12px Arial';
@@ -226,47 +292,89 @@ function drawUI() {
     ctx.fillStyle = '#333';
     ctx.fillRect(20, canvas.height - 70, 200, 20);
     const aminoWidth = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 200;
-    
+
     if (activeCell.aminoAcids >= activeCell.maxAminoAcids) {
-        ctx.fillStyle = '#00E676'; 
+        ctx.fillStyle = '#00E676';
         ctx.fillText("TRYK 'D' FOR AT DELE DIG", 230, canvas.height - 55);
     } else {
-        ctx.fillStyle = '#2196F3'; 
+        ctx.fillStyle = '#2196F3';
     }
     ctx.fillRect(20, canvas.height - 70, aminoWidth, 20);
-    
+
     ctx.fillStyle = '#FFF';
     ctx.fillText(`Vækst: ${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`, 25, canvas.height - 55);
     ctx.fillText(`Generation: ${generation} | Celler i alt: ${otherCells.length + 1}`, 20, 30);
 
+    // Debug info om verden
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.fillText(`World: ${worldWidth}x${worldHeight} | Cam: ${Math.floor(camera.x)},${Math.floor(camera.y)}`, 20, 50);
+
+
     if (isPaused && !isInspecting) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0,0,canvas.width, canvas.height);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white';
         ctx.font = '50px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText("PAUSE", canvas.width/2, canvas.height/2);
+        ctx.fillText("PAUSE", canvas.width / 2, canvas.height / 2);
     }
+
+    // Tegn Minimap til sidst i UI
+    drawMinimap();
+}
+
+function updateCamera() {
+    if (!activeCell) return;
+
+    // Center kamera på spilleren
+    camera.x = activeCell.x - canvas.width / 2;
+    camera.y = activeCell.y - canvas.height / 2;
+
+    // Hold kamera inden for verdenens grænser
+    camera.x = Math.max(0, Math.min(camera.x, worldWidth - canvas.width));
+    camera.y = Math.max(0, Math.min(camera.y, worldHeight - canvas.height));
 }
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    handleCellSwitch(); 
+    // 1. Logik opdateringer
+    handleCellSwitch();
+
+    // Opret et midlertidigt mouse objekt til logic updates som tager højde for kamera
+    const worldMouse = {
+        x: mouse.x + camera.x,
+        y: mouse.y + camera.y
+    };
 
     if (!isPaused) {
-        // SIMULATION
-        activeCell.update(mouse, keys, canvas.width, canvas.height);
-        otherCells.forEach(cell => checkCollisions(cell)); 
-        updateEnvironment(canvas.width, canvas.height);
+        // Opdater kamera position FØR vi tegner
+        updateCamera();
+
+        // SIMULATION (Brug verdens-dimensioner og verdens-mus)
+        activeCell.update(worldMouse, keys, worldWidth, worldHeight);
+        otherCells.forEach(cell => checkCollisions(cell));
+        updateEnvironment(worldWidth, worldHeight);
         checkCollisions(activeCell);
         handleDivision();
     }
 
-    // TEGNING
+    // 2. Tegning - Verden (Med Kamera Transform)
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    // Tegn en baggrund eller grænse for verden
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(0, 0, worldWidth, worldHeight);
+
     drawEnvironment(ctx);
     if (activeCell) activeCell.draw(ctx);
-    drawUI(); 
+
+    ctx.restore(); // Gå tilbage til skærm-koordinater
+
+    // 3. Tegning - UI (Ingen Transform - tegnes fast på skærmen)
+    drawUI();
 
     // Inspektion skal tegnes sidst, men kun hvis vi er i inspektionsmode
     if (isInspecting) {
