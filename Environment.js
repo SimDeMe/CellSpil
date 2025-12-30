@@ -22,15 +22,61 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
         spawnTimer = 0; 
     }
 
+    // Diffusion for næring
+    foodParticles.forEach(food => {
+        food.x += (Math.random() - 0.5) * 0.5; // Langsom diffusion
+        food.y += (Math.random() - 0.5) * 0.5;
+        // Grænser
+        if (food.x < 0) food.x = 0;
+        if (food.x > canvasWidth) food.x = canvasWidth;
+        if (food.y < 0) food.y = 0;
+        if (food.y > canvasHeight) food.y = canvasHeight;
+    });
+
     otherCells.forEach(cell => {
         // Her opdaterer vi NPC'erne
         cell.update(null, null, canvasWidth, canvasHeight);
+
+        // NPC Division
+        if (cell.alive && cell.aminoAcids >= cell.maxAminoAcids) {
+            spawnSisterCell(cell.x, cell.y, cell.genes);
+            cell.aminoAcids = 0;
+            cell.radius = cell.minRadius;
+        }
     });
 }
 
-export function spawnSisterCell(x, y) {
+export function spawnSisterCell(x, y, motherGenes = null) {
     const sister = new Cell(x, y, false);
-    sister.radius = 20; 
+    sister.radius = 20;
+
+    // Arv gener
+    if (motherGenes) {
+        sister.genes = { ...motherGenes };
+    }
+
+    // Mutation: 20% chance for en ny mutation
+    if (Math.random() < 0.2) {
+        // Liste af mulige mutationer som cellen ikke har endnu
+        const possibleMutations = [];
+        if (!sister.genes.cilia && !sister.genes.flagellum) {
+            // Hvis man ingen bevægelse har, kan man få cilier eller flagel
+            possibleMutations.push('cilia');
+            possibleMutations.push('flagellum');
+        } else if (sister.genes.cilia && !sister.genes.flagellum) {
+             // Hvis man har cilier, kan man opgradere til flagel
+             possibleMutations.push('flagellum');
+        }
+
+        if (possibleMutations.length > 0) {
+            const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
+            sister.genes[newMutation] = true;
+            // Hvis vi får flagel, overskriver det cilier (funktionelt) eller vi kan beholde begge,
+            // men logikken i Cell.js prioriterer flagel.
+            console.log("MUTATION! Ny gen: " + newMutation);
+        }
+    }
+
     otherCells.push(sister);
 }
 

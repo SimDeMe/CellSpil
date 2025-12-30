@@ -21,8 +21,15 @@ export class Cell {
         this.alive = true;
         this.color = isPlayer ? '#4CAF50' : '#888888';
 
+        // Gener
+        this.genes = {
+            flagellum: false,
+            cilia: false
+        };
+
         // NPC Bevægelse
-        this.moveAngle = Math.random() * Math.PI * 2; 
+        this.moveAngle = Math.random() * Math.PI * 2;
+        this.angle = 0;
     }
 
     update(mouse, inputKeys) {
@@ -41,24 +48,38 @@ export class Cell {
         this.radius = this.minRadius + (this.maxRadius - this.minRadius) * growthPercent;
 
         // 3. Bevægelse
-        if (this.isPlayer) {
-            // SPILLER
-            const dx = mouse.x - this.x;
-            const dy = mouse.y - this.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+        let canMove = false;
+        let currentSpeed = 0;
 
-            if (distance > 1) {
-                this.x += (dx / distance) * this.speed;
-                this.y += (dy / distance) * this.speed;
-                this.atp -= 0.02; 
+        if (this.genes.flagellum) {
+            canMove = true;
+            currentSpeed = this.speed;
+        } else if (this.genes.cilia) {
+            canMove = true;
+            currentSpeed = this.speed * 0.5; // Langsommere med cilier
+        }
+
+        if (canMove) {
+            if (this.isPlayer) {
+                // SPILLER
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                this.angle = Math.atan2(dy, dx);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > 1) {
+                    this.x += (dx / distance) * currentSpeed;
+                    this.y += (dy / distance) * currentSpeed;
+                    this.atp -= 0.02;
+                }
+            } else {
+                // NPC
+                this.moveAngle += (Math.random() - 0.5) * 0.1;
+                const npcSpeed = currentSpeed * 0.3;
+                this.x += Math.cos(this.moveAngle) * npcSpeed;
+                this.y += Math.sin(this.moveAngle) * npcSpeed;
+                this.atp -= 0.005;
             }
-        } else {
-            // NPC
-            this.moveAngle += (Math.random() - 0.5) * 0.1; 
-            const npcSpeed = this.speed * 0.3; 
-            this.x += Math.cos(this.moveAngle) * npcSpeed;
-            this.y += Math.sin(this.moveAngle) * npcSpeed;
-            this.atp -= 0.005;
         }
 
         // 4. Brownske bevægelser
@@ -102,6 +123,46 @@ export class Cell {
 
     draw(ctx) {
         const r = this.radius + Math.sin(this.pulse) * 2;
+
+        // Tegn Flagel (Hale) hvis den findes
+        if (this.genes.flagellum && this.alive) {
+            const tailLength = r * 1.5;
+            const direction = this.isPlayer ? (this.angle || 0) : this.moveAngle;
+            const angle = direction + Math.PI;
+
+            ctx.beginPath();
+            ctx.moveTo(this.x + Math.cos(angle) * r, this.y + Math.sin(angle) * r);
+
+            for(let i=0; i<tailLength; i+=2) {
+                const wave = Math.sin(this.pulse * 2 + i * 0.2) * 5;
+                ctx.lineTo(
+                    this.x + Math.cos(angle) * (r + i) + Math.cos(angle + Math.PI/2) * wave,
+                    this.y + Math.sin(angle) * (r + i) + Math.sin(angle + Math.PI/2) * wave
+                );
+            }
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Tegn Cilier (Hår) hvis den findes
+        if (this.genes.cilia && this.alive) {
+            const numCilia = 12;
+            for(let i=0; i<numCilia; i++) {
+                const angle = (Math.PI * 2 / numCilia) * i + this.pulse * 0.5;
+                const cX = this.x + Math.cos(angle) * r;
+                const cY = this.y + Math.sin(angle) * r;
+                const cEndX = this.x + Math.cos(angle) * (r + 5);
+                const cEndY = this.y + Math.sin(angle) * (r + 5);
+
+                ctx.beginPath();
+                ctx.moveTo(cX, cY);
+                ctx.lineTo(cEndX, cEndY);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
 
         ctx.beginPath();
         ctx.arc(this.x, this.y, r, 0, Math.PI * 2);

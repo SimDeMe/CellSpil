@@ -99,7 +99,7 @@ function handleCellSwitch() {
 
 function handleDivision() {
     if (keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
-        spawnSisterCell(activeCell.x, activeCell.y);
+        spawnSisterCell(activeCell.x, activeCell.y, activeCell.genes);
         
         activeCell.aminoAcids = 0; 
         activeCell.radius = activeCell.minRadius; 
@@ -112,7 +112,7 @@ function handleDivision() {
 // --- NY FUNKTION: Tegn Inspektion (RENSES FOR BILLEDE-TAGS) ---
 function drawInspectorWindow(cell) {
     // Sørg for at alt fryser i inspektionsmode
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const winWidth = 600;
@@ -121,7 +121,7 @@ function drawInspectorWindow(cell) {
     const winY = canvas.height / 2 - winHeight / 2;
 
     // Baggrund og kant
-    ctx.fillStyle = '#222';
+    ctx.fillStyle = '#111';
     ctx.fillRect(winX, winY, winWidth, winHeight);
     ctx.strokeStyle = cell.color;
     ctx.lineWidth = 5;
@@ -129,56 +129,84 @@ function drawInspectorWindow(cell) {
 
     ctx.fillStyle = 'white';
     ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText("🔬 DNA ANALYSE & MUTATIONER", winX + winWidth/2, winY + 40);
+
+    // --- DNA CIRKEL ---
+    const circleX = winX + winWidth / 2;
+    const circleY = winY + winHeight / 2 - 20;
+    const circleR = 100;
+
+    ctx.beginPath();
+    ctx.arc(circleX, circleY, circleR, 0, Math.PI * 2);
+    ctx.lineWidth = 15;
+    ctx.strokeStyle = '#FF4081'; // DNA farve
+    ctx.stroke();
+
+    // Pynt på DNA
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 64, 129, 0.5)';
+    for(let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 / 20) * i;
+        const innerR = circleR - 7;
+        const outerR = circleR + 7;
+        ctx.beginPath();
+        ctx.moveTo(circleX + Math.cos(angle) * innerR, circleY + Math.sin(angle) * innerR);
+        ctx.lineTo(circleX + Math.cos(angle) * outerR, circleY + Math.sin(angle) * outerR);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = '#FFF';
+    ctx.font = '16px Arial';
+    ctx.fillText("DNA STRUKTUR", circleX, circleY + 5);
+
+    // --- GENER / MUTATIONER LISTE ---
     ctx.textAlign = 'left';
-    ctx.fillText("🔬 CELLE-INSPEKTØR - GENERATION " + generation, winX + 20, winY + 40);
-
-    // --- CELLE INDHOLD (VENSTRE SIDE) ---
-    const contentX = winX + 40;
-    let contentY = winY + 80;
-
-    // Ribosomer (Proteinfabrikker)
-    ctx.font = '16px Arial';
-    ctx.fillStyle = '#C0C0C0';
-    ctx.fillText("🏭 Ribosomer (Proteinfabrik): Aktive", contentX, contentY); 
-    contentY += 25;
-
-    // DNA
-    ctx.fillStyle = '#FF4081';
-    ctx.fillText("🧬 Cirkulært DNA: Intakt", contentX, contentY); 
-    contentY += 25;
-
-    // RNA
-    ctx.fillStyle = '#B2FF59';
-    ctx.fillText("📜 mRNA (Næste protein): Klar", contentX, contentY);
-    contentY += 40;
-
-    // --- MEMBRAN PROTEINER (HØJRE SIDE) ---
+    ctx.fillStyle = '#FFF';
     ctx.font = '18px Arial bold';
+    ctx.fillText("AKTIVE GENER:", winX + 40, winY + 100);
+
+    let geneY = winY + 140;
+
+    // Flagel
+    if (cell.genes.flagellum) {
+        ctx.fillStyle = '#69F0AE';
+        ctx.fillText("✅ Flagel (Svømning)", winX + 40, geneY);
+    } else {
+        ctx.fillStyle = '#555';
+        ctx.fillText("❌ Flagel (Ingen)", winX + 40, geneY);
+    }
+    geneY += 30;
+
+    // Cilier
+    if (cell.genes.cilia) {
+        ctx.fillStyle = '#69F0AE';
+        ctx.fillText("✅ Cilier (Langsom bevægelse)", winX + 40, geneY);
+    } else {
+        ctx.fillStyle = '#555';
+        ctx.fillText("❌ Cilier (Ingen)", winX + 40, geneY);
+    }
+    geneY += 30;
+
+    // --- HØJRE SIDE INFO ---
+    const infoX = winX + 350;
+    let infoY = winY + 100;
     ctx.fillStyle = '#B3E5FC';
-    ctx.fillText("🧪 MEMBRAN PROTEINER (Transport)", winX + 320, winY + 80);
-    let membraneY = winY + 110;
+    ctx.fillText("STATUS:", infoX, infoY);
+    infoY += 40;
 
-    // Glukose Transport Protein (Passiv Diffusion)
     ctx.font = '16px Arial';
-    ctx.fillStyle = '#FFEB3B';
-    ctx.fillText("🔸 Glukose Transport: Passiv Diffusion", winX + 320, membraneY); 
-    membraneY += 25;
+    ctx.fillStyle = '#FFF';
+    ctx.fillText(`Generation: ${generation}`, infoX, infoY);
+    infoY += 25;
+    ctx.fillText(`ATP: ${Math.floor(cell.atp)}/${cell.maxAtp}`, infoX, infoY);
+    infoY += 25;
+    ctx.fillText(`Aminosyrer: ${cell.aminoAcids}/${cell.maxAminoAcids}`, infoX, infoY);
 
-    // Aminosyre Transport Protein (Aktiv Transport)
-    ctx.fillStyle = '#2196F3';
-    ctx.fillText("🔹 Aminosyre Transport: Aktiv Transport (ATP-krævende)", winX + 320, membraneY); 
-    membraneY += 40;
-
-
-    // --- STATUS ---
-    ctx.fillStyle = 'white';
-    ctx.font = '14px Arial';
-    ctx.fillText(`ATP: ${Math.floor(cell.atp)}/${cell.maxAtp}`, contentX, winY + winHeight - 60);
-    ctx.fillText(`Aminosyrer: ${cell.aminoAcids}/${cell.maxAminoAcids}`, contentX, winY + winHeight - 40);
-    
     // Luk knap info
     ctx.font = '18px Arial';
     ctx.textAlign = 'center';
+    ctx.fillStyle = '#888';
     ctx.fillText("Tryk 'I' eller 'INSPECT' for at lukke", canvas.width / 2, winY + winHeight - 20);
 }
 
