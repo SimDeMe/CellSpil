@@ -3,17 +3,17 @@ export class Cell {
         this.x = x;
         this.y = y;
         this.isPlayer = isPlayer;
-        
+
         // Størrelse
         this.radius = 20;
         this.minRadius = 20;
         this.maxRadius = 28;
         this.pulse = Math.random() * 10;
-        
+
         // --- INDSTILLINGER ---
-        this.speed = 1.5;      
-        this.maxAminoAcids = 3; 
-        
+        this.speed = 1.5;
+        this.maxAminoAcids = 3;
+
         // Ressourcer
         this.atp = 100;
         this.maxAtp = 100;
@@ -48,50 +48,51 @@ export class Cell {
         this.radius = this.minRadius + (this.maxRadius - this.minRadius) * growthPercent;
 
         // 3. Bevægelse
-        let canMove = false;
-        let currentSpeed = 0;
+        // Base hastighed (alle kan bevæge sig lidt)
+        let moveSpeed = 0.4; // Tunet til ca. 30-40 sekunder for krydsning
 
+        // Modifiers fra gener
         if (this.genes.flagellum) {
-            canMove = true;
-            currentSpeed = this.speed;
+            moveSpeed += 2.0; // Stor bonus
         } else if (this.genes.cilia) {
-            canMove = true;
-            currentSpeed = this.speed * 0.5; // Langsommere med cilier
+            moveSpeed += 1.0; // Lille bonus
         }
 
-        if (canMove) {
-            if (this.isPlayer) {
-                // SPILLER
-                const dx = mouse.x - this.x;
-                const dy = mouse.y - this.y;
-                this.angle = Math.atan2(dy, dx);
-                const distance = Math.sqrt(dx * dx + dy * dy);
+        if (this.isPlayer) {
+            // SPILLER - Styrer mod musen
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            this.angle = Math.atan2(dy, dx);
+            const distance = Math.sqrt(dx * dx + dy * dy);
 
-                if (distance > 1) {
-                    this.x += (dx / distance) * currentSpeed;
-                    this.y += (dy / distance) * currentSpeed;
-                    this.atp -= 0.02;
-                }
-            } else {
-                // NPC
-                this.moveAngle += (Math.random() - 0.5) * 0.1;
-                const npcSpeed = currentSpeed * 0.3;
-                this.x += Math.cos(this.moveAngle) * npcSpeed;
-                this.y += Math.sin(this.moveAngle) * npcSpeed;
-                this.atp -= 0.005;
+            if (distance > 1) {
+                this.x += (dx / distance) * moveSpeed;
+                this.y += (dy / distance) * moveSpeed;
+
+                // ATP omkostning (kun for ekstra fart)
+                if (this.genes.flagellum) this.atp -= 0.02;
+                else if (this.genes.cilia) this.atp -= 0.01;
+                else this.atp -= 0.005;
             }
+        } else {
+            // NPC - Bevæger sig tilfældigt
+            this.moveAngle += (Math.random() - 0.5) * 0.1;
+            const npcSpeed = moveSpeed * 0.5; // NPC'er er lidt langsommere
+            this.x += Math.cos(this.moveAngle) * npcSpeed;
+            this.y += Math.sin(this.moveAngle) * npcSpeed;
+            this.atp -= 0.005;
         }
 
-        // 4. Brownske bevægelser
+        // 4. Brownske bevægelser (Simpel jitter)
         this.x += (Math.random() - 0.5) * 0.5;
         this.y += (Math.random() - 0.5) * 0.5;
 
         // 5. Grænsekontrol
         // Venstre
         if (this.x - this.radius < 0) {
-            this.x = this.radius; 
-            if (!this.isPlayer) this.moveAngle = Math.PI - this.moveAngle; 
-        } 
+            this.x = this.radius;
+            if (!this.isPlayer) this.moveAngle = Math.PI - this.moveAngle;
+        }
         // Højre
         else if (this.x + this.radius > width) {
             this.x = width - this.radius;
@@ -101,8 +102,8 @@ export class Cell {
         // Top
         if (this.y - this.radius < 0) {
             this.y = this.radius;
-            if (!this.isPlayer) this.moveAngle = -this.moveAngle; 
-        } 
+            if (!this.isPlayer) this.moveAngle = -this.moveAngle;
+        }
         // Bund
         else if (this.y + this.radius > height) {
             this.y = height - this.radius;
@@ -114,11 +115,11 @@ export class Cell {
             this.kill();
         }
     }
-    
+
     kill() {
         this.atp = 0;
         this.alive = false;
-        this.color = '#444'; 
+        this.color = '#444';
     }
 
     draw(ctx) {
@@ -133,11 +134,11 @@ export class Cell {
             ctx.beginPath();
             ctx.moveTo(this.x + Math.cos(angle) * r, this.y + Math.sin(angle) * r);
 
-            for(let i=0; i<tailLength; i+=2) {
+            for (let i = 0; i < tailLength; i += 2) {
                 const wave = Math.sin(this.pulse * 2 + i * 0.2) * 5;
                 ctx.lineTo(
-                    this.x + Math.cos(angle) * (r + i) + Math.cos(angle + Math.PI/2) * wave,
-                    this.y + Math.sin(angle) * (r + i) + Math.sin(angle + Math.PI/2) * wave
+                    this.x + Math.cos(angle) * (r + i) + Math.cos(angle + Math.PI / 2) * wave,
+                    this.y + Math.sin(angle) * (r + i) + Math.sin(angle + Math.PI / 2) * wave
                 );
             }
             ctx.strokeStyle = this.color;
@@ -148,7 +149,7 @@ export class Cell {
         // Tegn Cilier (Hår) hvis den findes
         if (this.genes.cilia && this.alive) {
             const numCilia = 12;
-            for(let i=0; i<numCilia; i++) {
+            for (let i = 0; i < numCilia; i++) {
                 const angle = (Math.PI * 2 / numCilia) * i + this.pulse * 0.5;
                 const cX = this.x + Math.cos(angle) * r;
                 const cY = this.y + Math.sin(angle) * r;
@@ -184,7 +185,7 @@ export class Cell {
         } else {
             ctx.strokeStyle = '#000';
         }
-        
+
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.closePath();

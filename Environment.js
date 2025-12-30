@@ -1,13 +1,13 @@
-import { Cell } from './Cell.js'; 
+import { Cell } from './Cell.js';
 
 export const foodParticles = [];
-export const otherCells = []; 
+export const otherCells = [];
 
-const maxFood = 150; 
+const maxFood = 150;
 let spawnTimer = 0;
 
 export function initEnvironment(canvasWidth, canvasHeight) {
-    foodParticles.length = 0; 
+    foodParticles.length = 0;
     otherCells.length = 0;
 
     for (let i = 0; i < 50; i++) {
@@ -19,12 +19,12 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
     spawnTimer++;
     if (spawnTimer > 40 && foodParticles.length < maxFood) {
         spawnFood(canvasWidth, canvasHeight);
-        spawnTimer = 0; 
+        spawnTimer = 0;
     }
 
     // Diffusion for næring
     foodParticles.forEach(food => {
-        food.x += (Math.random() - 0.5) * 0.5; // Langsom diffusion
+        food.x += (Math.random() - 0.5) * 0.5;
         food.y += (Math.random() - 0.5) * 0.5;
         // Grænser
         if (food.x < 0) food.x = 0;
@@ -64,8 +64,8 @@ export function spawnSisterCell(x, y, motherGenes = null) {
             possibleMutations.push('cilia');
             possibleMutations.push('flagellum');
         } else if (sister.genes.cilia && !sister.genes.flagellum) {
-             // Hvis man har cilier, kan man opgradere til flagel
-             possibleMutations.push('flagellum');
+            // Hvis man har cilier, kan man opgradere til flagel
+            possibleMutations.push('flagellum');
         }
 
         if (possibleMutations.length > 0) {
@@ -84,8 +84,8 @@ export function getCellAtPosition(mouseX, mouseY) {
     for (let cell of otherCells) {
         const dx = cell.x - mouseX;
         const dy = cell.y - mouseY;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
         // Returner cellen hvis vi rammer den og den lever
         if (dist < cell.radius && cell.alive) {
             return cell;
@@ -112,12 +112,15 @@ function spawnFood(width, height) {
         y: Math.random() * height,
         type: 'glucose',
         radius: 3,
-        color: '#FFEB3B'
+        color: '#FFEB3B',
+        driftAngle: Math.random() * Math.PI * 2, // Start vinkel
+        vx: 0,
+        vy: 0
     };
     if (typeRandom > 0.8) {
         particle.type = 'amino';
-        particle.color = '#2196F3'; 
-        particle.radius = 4; 
+        particle.color = '#2196F3';
+        particle.radius = 4;
     }
     foodParticles.push(particle);
 }
