@@ -460,12 +460,22 @@ function updateInspectorSidebar(cell) {
         document.getElementById('inspGeneList').innerHTML = "<li><em>Observer Mode</em></li>";
     }
 
-    // Population Counters
+    // Population Counters (Now in left box)
     const playerCount = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
     const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
 
-    document.getElementById('popPlayer').innerText = playerCount;
-    document.getElementById('popBacillus').innerText = bacillusCount;
+    const elPlayer = document.getElementById('popPlayer');
+    const elBacillus = document.getElementById('popBacillus');
+    if (elPlayer) elPlayer.innerText = playerCount;
+    if (elBacillus) elBacillus.innerText = bacillusCount;
+}
+
+// Opdater UI (Kun de elementer der ikke er i sidebar - dvs. knapper/overlays hvis nødvendigt)
+function updateUI() {
+    if (!activeCell) return;
+
+    // Vi har fjernet atpDisplay og aminoDisplay fra index.html da de er redundante.
+    // Sidebar opdateres separat via updateInspectorSidebar().
 }
 
 function showInspectorSidebar(show) {
@@ -477,31 +487,7 @@ function drawUI() {
     // UI tegnes OVENPÅ alt
 
     if (activeCell) {
-        // ATP Bar
-        ctx.fillStyle = '#333';
-        ctx.fillRect(20, canvas.height - 40, 200, 20);
-        const atpWidth = (activeCell.atp / activeCell.maxAtp) * 200;
-        ctx.fillStyle = '#FFC107';
-        ctx.fillRect(20, canvas.height - 40, atpWidth, 20);
-        ctx.fillStyle = '#FFF';
-        ctx.font = '12px Arial';
-        ctx.fillText(`ATP: ${Math.floor(activeCell.atp)}`, 25, canvas.height - 25);
-
-        // Amino Bar
-        ctx.fillStyle = '#333';
-        ctx.fillRect(20, canvas.height - 70, 200, 20);
-        const aminoWidth = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 200;
-
-        if (activeCell.aminoAcids >= activeCell.maxAminoAcids) {
-            ctx.fillStyle = '#00E676';
-            ctx.fillText("TRYK 'D' FOR AT DELE DIG", 230, canvas.height - 55);
-        } else {
-            ctx.fillStyle = '#2196F3';
-        }
-        ctx.fillRect(20, canvas.height - 70, aminoWidth, 20);
-
-        ctx.fillStyle = '#FFF';
-        ctx.fillText(`Vækst: ${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`, 25, canvas.height - 55);
+        // ATP & Amino bars removed from bottom-left (Redundant)
     } else {
         // OBSERVE MODE UI Overlay
         ctx.fillStyle = 'rgba(171, 71, 188, 0.2)';
