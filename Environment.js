@@ -327,11 +327,12 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
 
             // Trigger UI popup hvis en mutation skete OG det er spillerens barn
             if (onMutationCallback && isPlayerChild) {
-                // Send BÅDE mutationstype OG den nye søster-celle med
-                console.log("Triggering mutation callback for player child: " + newMutation);
                 onMutationCallback(newMutation, sister);
             }
         }
+
+        // VIGTIGT: Opdater parametre efter mutationer/arv er sat
+        sister.updateMaxGrowth();
     }
 }
 
@@ -471,7 +472,8 @@ export function resolveCollisions(player, others) {
                 let eaten = false;
 
                 // Tjek om c1 spiser c2
-                if (c1.genes.endocytosis && c2.radius < c1.radius * 0.7 && c1.alive && c2.alive) {
+                // Krav: Endocytose gen, c1 > c2 i size tier (Større spiser mindre), mindre radius (0.7x), alder > 100
+                if (c1.genes.endocytosis && c1.size > c2.size && c2.radius < c1.radius * 0.7 && c1.alive && c2.alive && c2.age > 100) {
                     c2.kill();
                     c1.atp += 20;
                     c1.aminoAcids += 1;
@@ -480,7 +482,7 @@ export function resolveCollisions(player, others) {
                     console.log("Endocytose: C1 spiste C2");
                 }
                 // Tjek om c2 spiser c1
-                else if (c2.genes.endocytosis && c1.radius < c2.radius * 0.7 && c1.alive && c2.alive) {
+                else if (c2.genes.endocytosis && c2.size > c1.size && c1.radius < c2.radius * 0.7 && c1.alive && c2.alive && c1.age > 100) {
                     c1.kill();
                     c2.atp += 20;
                     c2.aminoAcids += 1;

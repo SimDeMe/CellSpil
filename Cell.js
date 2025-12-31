@@ -7,6 +7,7 @@ export class Cell {
         this.isPlayer = isPlayer;
 
         // Størrelse
+        this.size = 1; // [NEW] 1 = Normal, 2 = Stor
         this.radius = 20;
         this.minRadius = 20;
         this.maxRadius = 28;
@@ -36,6 +37,7 @@ export class Cell {
         this.maxNucleotides = this.baseMaxNucleotides;
 
         this.alive = true;
+        this.age = 0; // [NEW] Frames alive
         this.color = isPlayer ? '#4CAF50' : '#888888';
 
         // Gener
@@ -80,10 +82,12 @@ export class Cell {
 
         // Megacytose effekt på størrelse (Instant update ved init)
         if (this.genes.megacytosis) {
+            this.size = 2; // [NEW] Size class 2
             this.minRadius = 40; // 2x normal (20)
             this.maxRadius = 56; // 2x normal (28)
             this.radius = this.minRadius;
         } else {
+            this.size = 1; // [NEW] Size class 1
             this.minRadius = 20;
             this.maxRadius = 28;
         }
@@ -95,7 +99,7 @@ export class Cell {
         const width = worldWidth;
         const height = worldHeight;
 
-        // ... code omitted ...
+        this.age++; // Increment age
 
         // 3. Bevægelse
         // Base hastighed (alle kan bevæge sig lidt)
