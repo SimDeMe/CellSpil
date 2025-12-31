@@ -1,3 +1,5 @@
+import { GameConfig } from './GameConfig.js';
+
 export class Cell {
     constructor(x, y, isPlayer = false) {
         this.x = x;
@@ -11,20 +13,21 @@ export class Cell {
         this.pulse = Math.random() * 10;
 
         // --- INDSTILLINGER ---
-        this.speed = 1.5;
+        this.speed = GameConfig.Player.baseSpeed;
 
         // Vækst Modifiers (Nemt at redigere)
-        this.baseMaxAmino = 3;
-        this.aminoCostCilia = 2;
-        this.aminoCostFlagellum = 3;
-        this.aminoCostMegacytosis = 5;
-        this.aminoCostToxin = 1;
+        this.baseMaxAmino = GameConfig.Player.baseMaxAmino;
+        this.aminoCostCilia = GameConfig.Player.mutationCosts.cilia;
+        this.aminoCostFlagellum = GameConfig.Player.mutationCosts.flagellum;
+        this.aminoCostMegacytosis = GameConfig.Player.mutationCosts.megacytosis;
+        this.aminoCostToxin = GameConfig.Player.mutationCosts.toxin;
+        this.aminoCostProtease = GameConfig.Player.mutationCosts.protease;
 
         this.maxAminoAcids = this.baseMaxAmino; // Bliver opdateret af updateMaxGrowth()
 
         // Ressourcer
-        this.atp = 100;
-        this.maxAtp = 100;
+        this.atp = GameConfig.Player.maxAtp;
+        this.maxAtp = GameConfig.Player.maxAtp;
         this.aminoAcids = 0;
         this.alive = true;
         this.color = isPlayer ? '#4CAF50' : '#888888';
@@ -34,7 +37,8 @@ export class Cell {
             flagellum: false,
             cilia: false,
             megacytosis: false,
-            toxin: false
+            toxin: false,
+            protease: false
         };
 
         // Opdater hvis vi starter med gener (fx gemt spil)
@@ -54,6 +58,7 @@ export class Cell {
         if (this.genes.flagellum) cost += this.aminoCostFlagellum;
         if (this.genes.megacytosis) cost += this.aminoCostMegacytosis;
         if (this.genes.toxin) cost += this.aminoCostToxin;
+        if (this.genes.protease) cost += this.aminoCostProtease;
         this.maxAminoAcids = cost;
 
         // Megacytose effekt på størrelse (Instant update ved init)
@@ -104,9 +109,20 @@ export class Cell {
                         this.onAction('toxin', this.x, this.y);
                         this.atp -= 15;
                         this.aminoAcids -= 1;
-                        // Cooldown logic handled by key release ideally, 
-                        // but consuming key event works too
+                        // Cooldown handled by key release ideally
                         inputKeys.e = false;
+                    }
+                }
+            }
+
+            // ... PROTEASE ...
+            if (inputKeys.r && this.genes.protease) {
+                if (this.atp >= 10 && this.aminoAcids >= 1) {
+                    if (this.onAction) {
+                        this.onAction('protease', this.x, this.y);
+                        this.atp -= 10;
+                        this.aminoAcids -= 1;
+                        inputKeys.r = false;
                     }
                 }
             }
@@ -139,7 +155,7 @@ export class Cell {
 
                 // ATP omkostning (skaleret med fart?)
                 // Lad os sige det koster mindre at bevæge sig langsomt
-                let moveCost = 0.01;
+                let moveCost = GameConfig.Player.moveCost;
                 if (this.genes.flagellum) moveCost = 0.02;
                 else if (this.genes.cilia) moveCost = 0.015;
 
@@ -190,7 +206,7 @@ export class Cell {
             if (!this.isPlayer) this.moveAngle = -this.moveAngle;
         }
 
-        // 6. Død
+        // 6. Død - Starvation
         if (this.atp <= 0) {
             this.kill();
         }

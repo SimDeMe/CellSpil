@@ -1,10 +1,11 @@
 import { initInput, mouse, keys } from './Input.js';
 import { activeCell, initPlayer, setActiveCell } from './Player.js';
+import { GameConfig } from './GameConfig.js';
 import {
     initEnvironment, updateEnvironment, drawEnvironment,
     checkCollisions, spawnSisterCell, otherCells,
     getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
-    setMutationCallback, triggerInvasion, spawnToxinPulse
+    setMutationCallback, triggerInvasion, spawnToxinPulse, spawnProteasePulse
 } from './Environment.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -14,8 +15,8 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 // --- VERDEN & KAMERA ---
-const worldWidth = 5000;
-const worldHeight = 5000;
+const worldWidth = GameConfig.World.width;
+const worldHeight = GameConfig.World.height;
 
 const camera = {
     x: 0,
@@ -173,6 +174,10 @@ function showMutationPopup(mutationType, newCell = null) {
         title.innerText = "Ny Mutation: Toxin!";
         desc.innerText = "Tryk 'E' for at udskille gift der dræber konkurrenter.";
         cost.innerText = "PRIS: +1 Aminosyrer, 15 ATP pr. skud";
+    } else if (mutationType === 'protease') {
+        title.innerText = "Ny Mutation: Proteaser!";
+        desc.innerText = "Tryk 'R' for at opløse døde celler til mad.";
+        cost.innerText = "PRIS: +2 Aminosyrer, 10 ATP pr. skud";
     }
 
     // AUTO-SWITCH: Hvis vi har fået en ny celle, skift til den!
@@ -255,6 +260,8 @@ function init() {
         activeCell.onAction = (action, x, y) => {
             if (action === 'toxin') {
                 spawnToxinPulse(x, y);
+            } else if (action === 'protease') {
+                spawnProteasePulse(x, y);
             }
         };
     }
@@ -293,6 +300,7 @@ function handleCellSwitch() {
                 // Hook up actions
                 clickedCell.onAction = (action, x, y) => {
                     if (action === 'toxin') spawnToxinPulse(x, y);
+                    else if (action === 'protease') spawnProteasePulse(x, y);
                 };
 
                 console.log("Possessed cell!", clickedCell);
@@ -420,6 +428,7 @@ function updateInspectorSidebar(cell) {
         addGeneItem('Cilier', cell.genes.cilia, 'Bedre kontrol, Medium drift');
         addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
         addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
+        addGeneItem('Protease', cell.genes.protease, 'Opløs lig (Tryk R)');
     } else {
         // Hvis ingen celle er aktiv (Observe Mode)
         document.getElementById('inspAtpVal').innerText = "-";
@@ -541,7 +550,7 @@ function gameLoop() {
 
     if (!isPaused) {
         // Tids-baserede events (Invasion efter 60 sekunder)
-        if (!invasionTriggered && Date.now() - gameStartTime > 60000) {
+        if (!invasionTriggered && Date.now() - gameStartTime > GameConfig.World.invasionTime) {
             triggerInvasion(worldWidth, worldHeight);
             invasionTriggered = true;
             showEventPopup(

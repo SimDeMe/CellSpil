@@ -1,10 +1,14 @@
 import { Cell } from './Cell.js';
 import { Bacillus } from './Bacillus.js';
+import { GameConfig } from './GameConfig.js';
+import { activeCell } from './Player.js';
 
 export const foodParticles = [];
 export const otherCells = [];
 
-const maxFood = 1500;
+const crunchSound = new Audio('sounds/Crunch.mp3');
+
+const maxFood = GameConfig.World.foodMax;
 let spawnTimer = 0;
 
 let onMutationCallback = null;
@@ -35,6 +39,7 @@ export function triggerInvasion(canvasWidth, canvasHeight) {
 
 // Toxin System
 export const toxinParticles = [];
+export const proteaseParticles = [];
 
 export function spawnToxinPulse(x, y) {
     // Spawn 20 partikler i en cirkel
@@ -47,6 +52,21 @@ export function spawnToxinPulse(x, y) {
             vy: Math.sin(angle) * 3,
             life: 120, // 2 sekunder ved 60fps
             maxLife: 120
+        });
+    }
+}
+
+export function spawnProteasePulse(x, y) {
+    // Proteaser spredes langsommere men lever længere
+    for (let i = 0; i < 24; i++) {
+        const angle = (Math.PI * 2 / 24) * i;
+        proteaseParticles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * 1.5,
+            vy: Math.sin(angle) * 1.5,
+            life: 180, // 3 sekunder
+            maxLife: 180
         });
     }
 }
@@ -75,17 +95,75 @@ function updateToxinParticles(canvasWidth, canvasHeight) {
 
             if (dist < cell.radius) {
                 // Skade!
-                if (cell.isBacillus) {
-                    cell.kill();
-                    console.log("Bacillus dræbt af toxin!");
-                } else {
-                    // Hvis det er en normal celle, skader vi den måske lidt?
-                    // For nu, kun Bacillus dør instant.
+                if (!cell.isPlayer) {
+                    cell.alive = false;
+                    console.log("Celle dræbt af toxin!");
                 }
-                // Partiklen forsvinder ved ramt (eller skal den fortsætte?)
-                // Lad os fjerne den for impact-følelse
-                toxinParticles.splice(i, 1);
-                break; // Stop loopet for denne partikel
+
+                toxinParticles.splice(i, 1); // Partikel brugt
+                break;
+            }
+        }
+    }
+}
+
+function updateProteaseParticles(canvasWidth, canvasHeight) {
+    for (let i = proteaseParticles.length - 1; i >= 0; i--) {
+        const p = proteaseParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+
+        if (p.life <= 0) {
+            proteaseParticles.splice(i, 1);
+            continue;
+        }
+
+        // Tjek kollision med DØDE celler
+        for (let j = otherCells.length - 1; j >= 0; j--) {
+            const cell = otherCells[j];
+            if (cell.alive) continue; // Ignorer levende celler
+
+            const dx = p.x - cell.x;
+            const dy = p.y - cell.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < cell.radius) {
+                // Ramt et lig!
+                if (!cell.corpseHp) cell.corpseHp = 100; // Init corpse HP
+                cell.corpseHp -= 5; // Proteaser er effektive
+
+                // Visuel effekt? (Celle bliver mindre/gennemsigtig?)
+                cell.radius *= 0.99;
+
+                if (cell.corpseHp <= 0) {
+                    // Opløs cellen til mad!
+                    // Spawn 5 Glucose + 2 Amino
+                    for (let k = 0; k < 5; k++) {
+                        const f = {
+                            x: cell.x + (Math.random() - 0.5) * 20,
+                            y: cell.y + (Math.random() - 0.5) * 20,
+                            type: 'glucose', radius: 3, color: '#FFEB3B',
+                            vx: (Math.random() - 0.5), vy: (Math.random() - 0.5)
+                        };
+                        foodParticles.push(f);
+                    }
+                    for (let k = 0; k < 2; k++) {
+                        const f = {
+                            x: cell.x + (Math.random() - 0.5) * 20,
+                            y: cell.y + (Math.random() - 0.5) * 20,
+                            type: 'amino', radius: 4, color: '#2196F3',
+                            vx: (Math.random() - 0.5), vy: (Math.random() - 0.5)
+                        };
+                        foodParticles.push(f);
+                    }
+
+                    console.log("Lig opløst!");
+                    otherCells.splice(j, 1);
+                }
+
+                proteaseParticles.splice(i, 1); // Partikel brugt
+                break;
             }
         }
     }
@@ -93,12 +171,13 @@ function updateToxinParticles(canvasWidth, canvasHeight) {
 
 export function updateEnvironment(canvasWidth, canvasHeight) {
     spawnTimer++;
-    if (spawnTimer > 40 && foodParticles.length < maxFood) {
+    if (spawnTimer > GameConfig.World.foodSpawnRate && foodParticles.length < maxFood) {
         spawnFood(canvasWidth, canvasHeight);
         spawnTimer = 0;
     }
 
     updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
+    updateProteaseParticles(canvasWidth, canvasHeight); // Protease Update
 
     // Diffusion for næring
     foodParticles.forEach(food => {
@@ -122,7 +201,7 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
             if (cell.isBacillus && cell.aminoAcids >= 3) {
                 // Tjek max antal (50)
                 const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
-                if (bacillusCount < 50) {
+                if (bacillusCount < GameConfig.Bacillus.populationCap) {
                     const bx = cell.x + 20;
                     const by = cell.y + 20;
                     const child = new Bacillus(bx, by);
@@ -152,18 +231,25 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
 
     // Mutation: 40% chance for en ny mutation (FREMADRETTET)
     let mutated = false;
-    if (Math.random() < 0.4) {
+    if (Math.random() < GameConfig.Player.mutationRate) {
         // Liste af mulige mutationer som cellen ikke har endnu
         const possibleMutations = [];
         const g = sister.genes;
 
-        // Bevægelse
-        if (!g.cilia && !g.flagellum) possibleMutations.push('cilia', 'flagellum');
-        else if (g.cilia && !g.flagellum) possibleMutations.push('flagellum');
-
-        // Nye gener
-        if (!g.megacytosis) possibleMutations.push('megacytosis');
-        if (!g.toxin) possibleMutations.push('toxin');
+        // Rækkefølge: Movement -> Toxin -> Protease
+        if (!g.cilia && !g.flagellum) {
+            // Ingen bevægelse endnu. 50/50 Chance for Flagel eller Cilier
+            possibleMutations.push('cilia', 'flagellum');
+        } else if (!g.toxin) {
+            // Har bevægelse, men ikke toxin. Næste er toxin.
+            possibleMutations.push('toxin');
+        } else if (!g.protease) {
+            // Har toxin, men ikke protease. Næste er Protease.
+            possibleMutations.push('protease');
+        } else if (!g.megacytosis) {
+            // Har alt det andet? Så måske megacytosis til sidst.
+            possibleMutations.push('megacytosis');
+        }
 
         if (possibleMutations.length > 0) {
             const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
@@ -177,7 +263,7 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
     }
 
     // Tilbagemutation: 20% chance for at MISTE et gen (hvis vi ikke lige har fået et)
-    if (!mutated && Math.random() < 0.2) {
+    if (!mutated && Math.random() < GameConfig.Player.backMutationRate) {
         const activeGenes = Object.keys(sister.genes).filter(k => sister.genes[k]);
         if (activeGenes.length > 0) {
             const lostGene = activeGenes[Math.floor(Math.random() * activeGenes.length)];
@@ -259,12 +345,22 @@ export function drawEnvironment(ctx) {
         ctx.fill();
     });
 
-    // Tegn Toxin
+    // Tegn Toxin (Grøn)
     toxinParticles.forEach(p => {
-        ctx.globalAlpha = p.life / p.maxLife; // Fade out
+        ctx.globalAlpha = p.life / p.maxLife;
         ctx.fillStyle = '#00E676';
         ctx.beginPath();
         ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+
+    // Tegn Protease (Lilla/Rød)
+    proteaseParticles.forEach(p => {
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.fillStyle = '#E91E63'; // Pink ish
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
     });
@@ -285,10 +381,17 @@ export function checkCollisions(cell) {
 
         if (dist < cell.radius + food.radius) {
             foodParticles.splice(i, 1);
+
+            // Afspil lyd hvis det er spilleren der spiser
+            if (activeCell && cell === activeCell) {
+                crunchSound.currentTime = 0; // Reset for hurtig gentagelse
+                crunchSound.play().catch(e => console.log("Audio play failed:", e));
+            }
+
             if (food.type === 'glucose') {
-                cell.atp = Math.min(cell.atp + 20, cell.maxAtp);
+                cell.atp = Math.min(cell.atp + GameConfig.Resources.glucoseEnergy, cell.maxAtp);
             } else if (food.type === 'amino') {
-                cell.aminoAcids = Math.min(cell.aminoAcids + 1, cell.maxAminoAcids);
+                cell.aminoAcids = Math.min(cell.aminoAcids + GameConfig.Resources.aminoValue, cell.maxAminoAcids);
             }
         }
     }

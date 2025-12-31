@@ -9,7 +9,8 @@ export const keys = {
     i: false,  // Inspektion
     s: false,  // Cheat
     m: false,  // Cheat
-    e: false   // Toxin
+    e: false,  // Toxin
+    r: false   // Protease
 };
 
 
@@ -35,6 +36,7 @@ export function initInput() {
         if (e.code === 'KeyS') keys.s = true;
         if (e.code === 'KeyM') keys.m = true;
         if (e.code === 'KeyE') keys.e = true;
+        if (e.code === 'KeyR') keys.r = true;
     });
 
     window.addEventListener('keyup', (e) => {
@@ -42,5 +44,6 @@ export function initInput() {
         if (e.code === 'KeyS') keys.s = false;
         if (e.code === 'KeyM') keys.m = false;
         if (e.code === 'KeyE') keys.e = false;
+        if (e.code === 'KeyR') keys.r = false;
     });
 }

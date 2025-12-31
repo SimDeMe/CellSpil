@@ -1,4 +1,5 @@
 import { Cell } from './Cell.js';
+import { GameConfig } from './GameConfig.js';
 
 export class Bacillus extends Cell {
     constructor(x, y) {
@@ -12,7 +13,7 @@ export class Bacillus extends Cell {
         this.color = '#FF9800'; // Orange
 
         // Langsomme men effektive svømmere
-        this.speed = 0.5;
+        this.speed = GameConfig.Bacillus.speed;
 
         // Ingen gener
         this.genes = {
@@ -23,15 +24,19 @@ export class Bacillus extends Cell {
         };
 
         // Lavt basal stofskifte
-        this.maxAtp = 150;
-        this.atp = 150;
+        this.maxAtp = GameConfig.Bacillus.maxAtp;
+        this.atp = GameConfig.Bacillus.maxAtp;
     }
 
     update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells) {
         if (!this.alive) return;
 
         // Basal stofskifte (lavere end Cell)
-        this.atp -= 0.01;
+        this.atp -= GameConfig.Bacillus.passiveDecay;
+
+        if (this.atp <= 0) {
+            this.alive = false;
+        }
 
         let targetFound = false;
         let separationAngle = 0;
