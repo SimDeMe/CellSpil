@@ -33,8 +33,8 @@ button:hover {
 
 /* Mutation Popup */
 #mutationPopup {
-    position: absolute;
-    top: 20%;
+    position: fixed;
+    top: 50%;
     left: 50%;
     /* Center ift skærmen, ignorerer sidebar for nu */
     transform: translate(-50%, -50%);

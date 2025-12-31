@@ -12,8 +12,8 @@ export const GameConfig = {
         baseMaxAmino: 3,
         baseMaxNucleotides: 3, // [NEW] DNA byggesten
         moveCost: 0.01,
-        mutationRate: 0.4,
-        backMutationRate: 0.2,
+        mutationRate: 1.0,
+        backMutationRate: 0.0,
         mutationCosts: {
             cilia: 2,
             flagellum: 3,

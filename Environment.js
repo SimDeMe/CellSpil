@@ -311,46 +311,27 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
             if (!g.megacytosis) {
                 // Har alt det andet? Så måske megacytosis til sidst.
                 possibleMutations.push('megacytosis');
+            } else if (!g.endocytosis) {
+                // Dependency: Megacytosis -> Endocytosis
+                possibleMutations.push('endocytosis');
             }
         }
 
         if (possibleMutations.length > 0) {
+            // Vi deklarerer variabelen her så den er tilgængelig i scopet
             const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
             sister.genes[newMutation] = true;
             mutated = true;
 
             console.log("MUTATION! Ny gen: " + newMutation);
 
-            // Vi venter med at kalde callback til cellen er færdig-konfigureret og pushet
+            // Trigger UI popup hvis en mutation skete OG det er spillerens barn
+            if (onMutationCallback && isPlayerChild) {
+                // Send BÅDE mutationstype OG den nye søster-celle med
+                console.log("Triggering mutation callback for player child: " + newMutation);
+                onMutationCallback(newMutation, sister);
+            }
         }
-    }
-
-    // Tilbagemutation: 20% chance for at MISTE et gen (hvis vi ikke lige har fået et)
-    if (!mutated && Math.random() < GameConfig.Player.backMutationRate) {
-        const activeGenes = Object.keys(sister.genes).filter(k => sister.genes[k]);
-        if (activeGenes.length > 0) {
-            const lostGene = activeGenes[Math.floor(Math.random() * activeGenes.length)];
-            sister.genes[lostGene] = false;
-            console.log("BACK-MUTATION! Mistet gen: " + lostGene);
-            // Evt. popup for tabt gen? For nu nøjes vi med log.
-        }
-    }
-
-    // VIGTIGT: Opdater max amino krav efter gener er ændret
-    sister.updateMaxGrowth();
-
-    // Tilføj til listen FØR vi kalder callback, så den kan findes og fjernes ved swap
-    otherCells.push(sister);
-
-    // Trigger UI popup hvis en mutation skete OG det er spillerens barn
-    if (mutated && onMutationCallback && isPlayerChild) {
-        // Send BÅDE mutationstype OG den nye søster-celle med
-        console.log("Triggering mutation callback for player child");
-        onMutationCallback(mutated ? (sister.genes.highTorque ? 'highTorque' : sister.genes.toxin ? 'toxin' : sister.genes.megacytosis ? 'megacytosis' : sister.genes.flagellum ? 'flagellum' : sister.genes.cilia ? 'cilia' : 'unknown') : null, sister);
-
-        // Hov, min logik for mutationType string ovenfor var lidt doven.
-        // Vi skal vide PRÆCIS hvilken mutation der skete.
-        // Vi kan redde det ved at gemme mutationsnavnet i en variabel.
     }
 }
 
