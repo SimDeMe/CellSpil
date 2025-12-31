@@ -112,19 +112,36 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
     });
 
     otherCells.forEach(cell => {
-        // Her opdaterer vi NPC'erne
-        cell.update(null, null, canvasWidth, canvasHeight);
+        // Her opdaterer vi NPC'erne (Bacillus og andre)
+        // Send foodParticles med så Bacillus kan finde mad
+        cell.update(null, null, canvasWidth, canvasHeight, foodParticles);
 
-        // NPC Division
-        if (cell.alive && cell.aminoAcids >= cell.maxAminoAcids) {
-            spawnSisterCell(cell.x, cell.y, cell.genes);
-            cell.aminoAcids = 0;
-            cell.radius = cell.minRadius;
+        // Division Logic
+        if (cell.alive) {
+            // Bacillus Division
+            if (cell.isBacillus && cell.aminoAcids >= 3) {
+                // Tjek max antal (50)
+                const bacillusCount = otherCells.filter(c => c.isBacillus).length;
+                if (bacillusCount < 50) {
+                    const bx = cell.x + 20;
+                    const by = cell.y + 20;
+                    const child = new Bacillus(bx, by);
+                    otherCells.push(child);
+                    // Reset mor
+                    cell.aminoAcids = 0;
+                }
+            }
+            // Normal Celle Division (NPC)
+            else if (!cell.isBacillus && cell.aminoAcids >= cell.maxAminoAcids) {
+                spawnSisterCell(cell.x, cell.y, cell.genes);
+                cell.aminoAcids = 0;
+                cell.radius = cell.minRadius;
+            }
         }
     });
 }
 
-export function spawnSisterCell(x, y, motherGenes = null) {
+export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false) {
     const sister = new Cell(x, y, false);
     sister.radius = 20;
 
@@ -155,10 +172,7 @@ export function spawnSisterCell(x, y, motherGenes = null) {
 
             console.log("MUTATION! Ny gen: " + newMutation);
 
-            // Trigger UI popup hvis callback er sat
-            if (onMutationCallback) {
-                onMutationCallback(newMutation);
-            }
+            // Vi venter med at kalde callback til cellen er færdig-konfigureret og pushet
         }
     }
 
@@ -176,7 +190,19 @@ export function spawnSisterCell(x, y, motherGenes = null) {
     // VIGTIGT: Opdater max amino krav efter gener er ændret
     sister.updateMaxGrowth();
 
+    // Tilføj til listen FØR vi kalder callback, så den kan findes og fjernes ved swap
     otherCells.push(sister);
+
+    // Trigger UI popup hvis en mutation skete OG det er spillerens barn
+    if (mutated && onMutationCallback && isPlayerChild) {
+        // Send BÅDE mutationstype OG den nye søster-celle med
+        console.log("Triggering mutation callback for player child");
+        onMutationCallback(mutated ? (sister.genes.toxin ? 'toxin' : sister.genes.megacytosis ? 'megacytosis' : sister.genes.flagellum ? 'flagellum' : sister.genes.cilia ? 'cilia' : 'unknown') : null, sister);
+
+        // Hov, min logik for mutationType string ovenfor var lidt doven.
+        // Vi skal vide PRÆCIS hvilken mutation der skete.
+        // Vi kan redde det ved at gemme mutationsnavnet i en variabel.
+    }
 }
 
 export function getCellAtPosition(mouseX, mouseY) {

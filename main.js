@@ -95,7 +95,7 @@ function triggerApoptosis() {
 }
 
 // --- MUTATION POPUP ---
-function showMutationPopup(mutationType) {
+function showMutationPopup(mutationType, newCell = null) {
     const popup = document.getElementById('mutationPopup');
     const title = document.getElementById('mutTitle');
     const desc = document.getElementById('mutDesc');
@@ -108,19 +108,43 @@ function showMutationPopup(mutationType) {
     if (mutationType === 'flagellum') {
         title.innerText = "Ny Mutation: Flagel!";
         desc.innerText = "En lang hale der giver kraftig fremdrift.";
-        cost.innerText = "PRIS: +3 Vækst, 2x ATP forbrug";
+        cost.innerText = "PRIS: +3 Aminosyrer, 2x ATP forbrug";
     } else if (mutationType === 'cilia') {
         title.innerText = "Ny Mutation: Cilier!";
         desc.innerText = "Små fimrehår der giver bedre kontrol.";
-        cost.innerText = "PRIS: +2 Vækst, 1.5x ATP forbrug";
+        cost.innerText = "PRIS: +2 Aminosyrer, 1.5x ATP forbrug";
     } else if (mutationType === 'megacytosis') {
         title.innerText = "Ny Mutation: Megacytose!";
         desc.innerText = "Du vokser til dobbelt størrelse! Mere HP, men langsommere.";
-        cost.innerText = "PRIS: +5 Vækst, 2x ATP (Stofskifte & Bevægelse), ½ Fart";
+        cost.innerText = "PRIS: +5 Aminosyrer, 2x ATP (Stofskifte & Bevægelse), ½ Fart";
     } else if (mutationType === 'toxin') {
         title.innerText = "Ny Mutation: Toxin!";
         desc.innerText = "Tryk 'E' for at udskille gift der dræber konkurrenter.";
-        cost.innerText = "PRIS: +1 Vækst, 15 ATP pr. skud";
+        cost.innerText = "PRIS: +1 Aminosyrer, 15 ATP pr. skud";
+    }
+
+    // AUTO-SWITCH: Hvis vi har fået en ny celle, skift til den!
+    if (newCell) {
+        // Gem den gamle spiller reference før vi skifter
+        const oldPlayer = activeCell;
+
+        // Gammel spiller til environment
+        addCellToEnvironment(oldPlayer);
+        // Fjern ny celle fra environment (den blev tilføjet i spawnSisterCell)
+        removeCellFromEnvironment(newCell);
+
+        // Sæt som aktiv
+        setActiveCell(newCell);
+
+        // VIGTIGT: Overfør callback (så 'E' virker på den nye celle)
+        if (oldPlayer) {
+            newCell.onAction = oldPlayer.onAction;
+            oldPlayer.onAction = null;
+        }
+
+        // Opdater kamera med det samme
+        updateCamera();
+        console.log("Auto-switched to new mutated cell! Coords:", newCell.x, newCell.y);
     }
 
     // Skjul efter 5 sekunder
@@ -215,13 +239,22 @@ function handleCellSwitch() {
 
 function handleDivision() {
     if (keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
-        spawnSisterCell(activeCell.x, activeCell.y, activeCell.genes);
+        // Gem reference til moderen, da activeCell kan ændre sig under spawnSisterCell (ved mutation swap)
+        const mother = activeCell;
 
-        activeCell.aminoAcids = 0;
-        activeCell.radius = activeCell.minRadius;
-        activeCell.x += 30;
+        // Spawn søster (true = spillerens barn)
+        spawnSisterCell(mother.x, mother.y, mother.genes, true);
+
+        // Reset moderen (selvom vi måske ikke styrer hende mere, skal hun nulstilles i verdenen)
+        mother.aminoAcids = 0;
+        mother.radius = mother.minRadius;
+        // Flyt kun moderen lidt væk, så de ikke hænger sammen
+        mother.x += 30;
 
         generation++;
+
+        // Forhindr "maskingevær" deling ved at fjerne trykket
+        keys.d = false;
     }
 }
 
@@ -379,6 +412,13 @@ function updateCamera() {
     // Center kamera på spilleren
     camera.x = activeCell.x - canvas.width / 2;
     camera.y = activeCell.y - canvas.height / 2;
+
+    if (isNaN(camera.x) || isNaN(camera.y)) {
+        console.error("CAMERA IS NAN! ActiveCell:", activeCell);
+        // Nød-fix
+        camera.x = 0;
+        camera.y = 0;
+    }
 
     // Hold kamera inden for verdenens grænser
     camera.x = Math.max(0, Math.min(camera.x, worldWidth - canvas.width));

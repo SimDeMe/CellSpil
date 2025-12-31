@@ -99,7 +99,7 @@ export class Cell {
             moveSpeed += 1.0; // Lille bonus
         }
 
-        if (this.isPlayer) {
+        if (this.isPlayer && inputKeys) {
             // CHEAT: S + M giver fuld ressourcer
             if (inputKeys.s && inputKeys.m) {
                 this.atp = this.maxAtp;
