@@ -23,6 +23,7 @@ export class Cell {
         this.aminoCostToxin = GameConfig.Player.mutationCosts.toxin;
         this.aminoCostProtease = GameConfig.Player.mutationCosts.protease;
         this.aminoCostHighTorque = GameConfig.Player.mutationCosts.highTorque;
+        this.aminoCostEndocytosis = GameConfig.Player.mutationCosts.endocytosis;
 
         this.maxAminoAcids = this.baseMaxAmino; // Bliver opdateret af updateMaxGrowth()
 
@@ -30,6 +31,10 @@ export class Cell {
         this.atp = GameConfig.Player.maxAtp;
         this.maxAtp = GameConfig.Player.maxAtp;
         this.aminoAcids = 0;
+        this.nucleotides = 0; // [NEW]
+        this.baseMaxNucleotides = GameConfig.Player.baseMaxNucleotides;
+        this.maxNucleotides = this.baseMaxNucleotides;
+
         this.alive = true;
         this.color = isPlayer ? '#4CAF50' : '#888888';
 
@@ -40,7 +45,8 @@ export class Cell {
             megacytosis: false,
             toxin: false,
             protease: false,
-            highTorque: false
+            highTorque: false,
+            endocytosis: false
         };
 
         // Opdater hvis vi starter med gener (fx gemt spil)
@@ -62,7 +68,15 @@ export class Cell {
         if (this.genes.toxin) cost += this.aminoCostToxin;
         if (this.genes.protease) cost += this.aminoCostProtease;
         if (this.genes.highTorque) cost += this.aminoCostHighTorque;
+        if (this.genes.protease) cost += this.aminoCostProtease;
+        if (this.genes.highTorque) cost += this.aminoCostHighTorque;
         this.maxAminoAcids = cost;
+
+        // Nucleotides scales roughly with complex genes too? 
+        // For now, keep it simple: Base + 1 per complex gene?
+        // Or fixed base. Let's start fixed.
+        this.maxNucleotides = this.baseMaxNucleotides;
+        if (this.genes.megacytosis) this.maxNucleotides += 2; // Bigger cell needs more DNA stuff
 
         // Megacytose effekt på størrelse (Instant update ved init)
         if (this.genes.megacytosis) {
@@ -279,9 +293,9 @@ export class Cell {
         ctx.beginPath();
         ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
 
-        if (this.alive && this.aminoAcids >= this.maxAminoAcids) {
+        if (this.alive && this.aminoAcids >= this.maxAminoAcids && this.nucleotides >= this.maxNucleotides) {
             ctx.shadowBlur = 15;
-            ctx.shadowColor = this.isPlayer ? '#69F0AE' : '#FFF';
+            ctx.shadowColor = '#00BCD4'; // Cyan glow for ready to divide
             ctx.fillStyle = this.isPlayer ? '#69F0AE' : '#DDD';
         } else {
             ctx.shadowBlur = 0;

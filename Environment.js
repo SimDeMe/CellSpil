@@ -402,8 +402,12 @@ function spawnFood(width, height) {
 export function drawEnvironment(ctx) {
     foodParticles.forEach(food => {
         ctx.beginPath();
-        if (food.type === 'glucose') ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
-        else ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
+        if (food.type === 'glucose') {
+            ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
+        } else {
+            // Amino (Blue) & Nucleotides (Cyan) are squares
+            ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
+        }
         ctx.fillStyle = food.color;
         ctx.fill();
     });
@@ -455,6 +459,9 @@ export function checkCollisions(cell) {
                 cell.atp = Math.min(cell.atp + GameConfig.Resources.glucoseEnergy, cell.maxAtp);
             } else if (food.type === 'amino') {
                 cell.aminoAcids = Math.min(cell.aminoAcids + GameConfig.Resources.aminoValue, cell.maxAminoAcids);
+            } else if (food.type === 'nucleotide') {
+                // [NEW]
+                cell.nucleotides = Math.min(cell.nucleotides + GameConfig.Resources.nucleotideValue, cell.maxNucleotides);
             }
         }
     }
@@ -479,17 +486,43 @@ export function resolveCollisions(player, others) {
             if (dist < minDist) {
                 // Kollision!
 
-                // 1. Skub dem fra hinanden (Position Correction) for at undgå overlap
-                const angle = Math.atan2(dy, dx);
-                const overlap = minDist - dist;
-                const pushX = Math.cos(angle) * overlap * 0.5;
-                const pushY = Math.sin(angle) * overlap * 0.5;
+                // --- ENDOCYTOSE (Spisning af mindre celler) ---
+                let eaten = false;
 
-                // Opdater positioner direkte
-                c1.x -= pushX;
-                c1.y -= pushY;
-                c2.x += pushX;
-                c2.y += pushY;
+                // Tjek om c1 spiser c2
+                if (c1.genes.endocytosis && c2.radius < c1.radius * 0.7 && c1.alive && c2.alive) {
+                    c2.kill();
+                    c1.atp += 20;
+                    c1.aminoAcids += 1;
+                    c1.nucleotides += 1;
+                    eaten = true;
+                    console.log("Endocytose: C1 spiste C2");
+                }
+                // Tjek om c2 spiser c1
+                else if (c2.genes.endocytosis && c1.radius < c2.radius * 0.7 && c1.alive && c2.alive) {
+                    c1.kill();
+                    c2.atp += 20;
+                    c2.aminoAcids += 1;
+                    c2.nucleotides += 1;
+                    eaten = true;
+                    console.log("Endocytose: C2 spiste C1");
+                }
+
+                if (!eaten) {
+                    // 1. Skub dem fra hinanden (Position Correction)
+
+                    // 1. Skub dem fra hinanden (Position Correction) for at undgå overlap
+                    const angle = Math.atan2(dy, dx);
+                    const overlap = minDist - dist;
+                    const pushX = Math.cos(angle) * overlap * 0.5;
+                    const pushY = Math.sin(angle) * overlap * 0.5;
+
+                    // Opdater positioner direkte
+                    c1.x -= pushX;
+                    c1.y -= pushY;
+                    c2.x += pushX;
+                    c2.y += pushY;
+                }
             }
         }
     }

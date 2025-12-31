@@ -10,6 +10,7 @@ export const GameConfig = {
         baseSpeed: 1.5,
         maxAtp: 100,
         baseMaxAmino: 3,
+        baseMaxNucleotides: 3, // [NEW] DNA byggesten
         moveCost: 0.01,
         mutationRate: 0.4,
         backMutationRate: 0.2,
@@ -19,7 +20,8 @@ export const GameConfig = {
             megacytosis: 5,
             toxin: 1,
             protease: 2,
-            highTorque: 5 // Dyr, men effektiv
+            highTorque: 5,
+            endocytosis: 8 // [NEW] Dyr, kræver Megacytose
         }
     },
     Bacillus: { // The Enemy
@@ -30,6 +32,7 @@ export const GameConfig = {
     },
     Resources: {
         glucoseEnergy: 20,
-        aminoValue: 1
+        aminoValue: 1,
+        nucleotideValue: 1 // [NEW] Værdi pr. klump
     }
 };

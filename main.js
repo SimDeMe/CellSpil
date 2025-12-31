@@ -435,6 +435,11 @@ function updateInspectorSidebar(cell) {
         document.getElementById('inspAminoBar').style.width = aminoPct + '%';
         document.getElementById('inspAminoVal').innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
 
+        // Nucleotides
+        const nucleoPct = (cell.nucleotides / cell.maxNucleotides) * 100;
+        document.getElementById('inspNucleoBar').style.width = nucleoPct + '%';
+        document.getElementById('inspNucleoVal').innerText = `${cell.nucleotides} / ${cell.maxNucleotides}`;
+
         // Gener Liste
         const list = document.getElementById('inspGeneList');
         list.innerHTML = ''; // Start forfra
@@ -453,10 +458,12 @@ function updateInspectorSidebar(cell) {
         addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
         addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
         addGeneItem('Protease', cell.genes.protease, 'Opløs lig (Tryk R)');
+        addGeneItem('Endocytosis', cell.genes.endocytosis, 'Spis små celler (Passiv)');
     } else {
         // Hvis ingen celle er aktiv (Observe Mode)
         document.getElementById('inspAtpVal').innerText = "-";
         document.getElementById('inspAminoVal').innerText = "-";
+        document.getElementById('inspNucleoVal').innerText = "-"; // Reset values
         document.getElementById('inspGeneList').innerHTML = "<li><em>Observer Mode</em></li>";
     }
 
