@@ -26,6 +26,7 @@ const camera = {
 
 let isPaused = false;
 let isInspecting = false;
+let isObserverMode = false;
 let generation = 1;
 let gameStartTime = Date.now();
 let invasionTriggered = false;
@@ -36,8 +37,30 @@ try {
     document.getElementById('resetBtn').addEventListener('click', resetGame);
     document.getElementById('apoBtn').addEventListener('click', triggerApoptosis);
     document.getElementById('inspectBtn').addEventListener('click', toggleInspect);
+    document.getElementById('observeBtn').addEventListener('click', toggleObserve);
+
+    // Minimap Click Logic
+    const miniCanvas = document.getElementById('minimapCanvas');
+    miniCanvas.addEventListener('mousedown', (e) => {
+        if (!isObserverMode) return;
+
+        const rect = miniCanvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        // Map minicanvas coords to world coords
+        const scaleX = worldWidth / miniCanvas.width;
+        const scaleY = worldHeight / miniCanvas.height;
+
+        camera.x = (mx * scaleX) - camera.width / 2;
+        camera.y = (my * scaleY) - camera.height / 2;
+
+        // Clamp
+        camera.x = Math.max(0, Math.min(camera.x, worldWidth - camera.width));
+        camera.y = Math.max(0, Math.min(camera.y, worldHeight - camera.height));
+    });
 } catch (e) {
-    console.error("Kunne ikke finde knapperne. Husk at gemme index.html!");
+    console.error("Kunne ikke finde knapperne. Husk at gemme index.html!", e);
 }
 
 window.addEventListener('keydown', (e) => {
@@ -75,17 +98,46 @@ function toggleInspect() {
     showInspectorSidebar(isInspecting);
 }
 
+function toggleObserve() {
+    isObserverMode = !isObserverMode;
+    const btn = document.getElementById('observeBtn');
+
+    if (isObserverMode && activeCell) {
+        // Gå ind i Observe Mode: Slip spilleren
+        addCellToEnvironment(activeCell);
+        activeCell.isPlayer = false; // Bliver NPC
+        setActiveCell(null); // Ingen spiller
+
+        btn.classList.add('active-observe');
+        btn.innerText = "👁 SEEK";
+        console.log("Observe Mode Activated");
+    } else if (!isObserverMode) {
+        // Ud af observe mode via knap?
+        // Vi kan ikke bare 'blive' en spiller igen uden at vælge en.
+        // Så hvis man klikker knappen for at slå fra, skal vi finde en tilfældig celle?
+        // Eller bare vente til man klikker på en celle.
+        // Lad os sige knappen kun virker 'ind', men man skal klikke for at komme 'ud'.
+        // Men for god ordens skyld:
+        btn.classList.remove('active-observe');
+        btn.innerText = "👁 OBSERVE";
+        // Vi forbliver 'null' indtil man klikker på en celle.
+    }
+}
+
 function resetGame() {
     generation = 1;
     isPaused = false;
     isInspecting = false;
+    isObserverMode = false;
+    document.getElementById('observeBtn').classList.remove('active-observe');
+    document.getElementById('observeBtn').innerText = "👁 OBSERVE";
+
     showInspectorSidebar(false); // Skjul
     const btn = document.getElementById('pauseBtn');
     if (btn) btn.innerText = "⏸ PAUSE";
     init();
 }
 
-// ... (Resten af filen)
 
 function triggerApoptosis() {
     if (activeCell && activeCell.alive) {
@@ -128,8 +180,11 @@ function showMutationPopup(mutationType, newCell = null) {
         // Gem den gamle spiller reference før vi skifter
         const oldPlayer = activeCell;
 
-        // Gammel spiller til environment
-        addCellToEnvironment(oldPlayer);
+        if (oldPlayer) { // Kun hvis vi har en spiller
+            // Gammel spiller til environment
+            addCellToEnvironment(oldPlayer);
+        }
+
         // Fjern ny celle fra environment (den blev tilføjet i spawnSisterCell)
         removeCellFromEnvironment(newCell);
 
@@ -223,14 +278,35 @@ function handleCellSwitch() {
         const clickedCell = getCellAtPosition(mouseWorldX, mouseWorldY);
 
         if (clickedCell) {
-            const oldPlayer = activeCell;
-            addCellToEnvironment(oldPlayer);
-            removeCellFromEnvironment(clickedCell);
-            setActiveCell(clickedCell);
+            // Hvis vi er i OBSERVE mode, så overtag cellen!
+            if (isObserverMode || !activeCell) {
+                removeCellFromEnvironment(clickedCell);
+                setActiveCell(clickedCell);
+                clickedCell.isPlayer = true;
 
-            // Overfør callback
-            clickedCell.onAction = oldPlayer.onAction;
-            oldPlayer.onAction = null;
+                // Exit Observe Mode
+                isObserverMode = false;
+                const btn = document.getElementById('observeBtn');
+                btn.classList.remove('active-observe');
+                btn.innerText = "👁 OBSERVE";
+
+                // Hook up actions
+                clickedCell.onAction = (action, x, y) => {
+                    if (action === 'toxin') spawnToxinPulse(x, y);
+                };
+
+                console.log("Possessed cell!", clickedCell);
+            } else {
+                // Alm. switch logic (hvis man klikker mens man spiller)
+                const oldPlayer = activeCell;
+                addCellToEnvironment(oldPlayer);
+                removeCellFromEnvironment(clickedCell);
+                setActiveCell(clickedCell);
+
+                // Overfør callback
+                clickedCell.onAction = oldPlayer.onAction;
+                oldPlayer.onAction = null;
+            }
 
             mouse.clicked = false;
         }
@@ -238,7 +314,7 @@ function handleCellSwitch() {
 }
 
 function handleDivision() {
-    if (keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
+    if (activeCell && keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
         // Gem reference til moderen, da activeCell kan ændre sig under spawnSisterCell (ved mutation swap)
         const mother = activeCell;
 
@@ -258,7 +334,6 @@ function handleDivision() {
     }
 }
 
-// --- MINIMAP FUNKTION ---
 // --- MINIMAP FUNKTION ---
 function drawMinimap() {
     const miniCanvas = document.getElementById('minimapCanvas');
@@ -282,12 +357,14 @@ function drawMinimap() {
     miniCtx.strokeRect(0, 0, mapW, mapH);
 
     // 3. Andre celler
-    miniCtx.fillStyle = '#FF5252';
     otherCells.forEach(cell => {
         const cx = cell.x * scale;
         const cy = cell.y * scale;
         miniCtx.beginPath();
         miniCtx.arc(cx, cy, 2, 0, Math.PI * 2);
+
+        // Farv Bacillus orange, andre røde
+        miniCtx.fillStyle = cell.isBacillus ? '#FF9800' : '#FF5252';
         miniCtx.fill();
     });
 
@@ -316,82 +393,99 @@ function updateInspectorSidebar(cell) {
     // Opdater DOM elementer
     document.getElementById('inspGen').innerText = generation;
 
-    // ATP
-    const atpPct = (cell.atp / cell.maxAtp) * 100;
-    document.getElementById('inspAtpBar').style.width = atpPct + '%';
-    document.getElementById('inspAtpVal').innerText = `${Math.floor(cell.atp)} / ${cell.maxAtp}`;
+    if (cell) {
+        // ATP
+        const atpPct = (cell.atp / cell.maxAtp) * 100;
+        document.getElementById('inspAtpBar').style.width = atpPct + '%';
+        document.getElementById('inspAtpVal').innerText = `${Math.floor(cell.atp)} / ${cell.maxAtp}`;
 
-    // Amino
-    const aminoPct = (cell.aminoAcids / cell.maxAminoAcids) * 100;
-    document.getElementById('inspAminoBar').style.width = aminoPct + '%';
-    document.getElementById('inspAminoVal').innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
+        // Amino
+        const aminoPct = (cell.aminoAcids / cell.maxAminoAcids) * 100;
+        document.getElementById('inspAminoBar').style.width = aminoPct + '%';
+        document.getElementById('inspAminoVal').innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
 
-    // Gener Liste
-    const list = document.getElementById('inspGeneList');
-    list.innerHTML = ''; // Start forfra
+        // Gener Liste
+        const list = document.getElementById('inspGeneList');
+        list.innerHTML = ''; // Start forfra
 
-    // Helper function
-    function addGeneItem(name, active, desc) {
-        const li = document.createElement('li');
-        li.className = active ? 'active' : '';
-        li.innerHTML = `<strong>${name}</strong><br><span style="color:#aaa; font-size:12px;">${active ? desc : 'Ikke aktiv'}</span>`;
-        list.appendChild(li);
+        // Helper function
+        function addGeneItem(name, active, desc) {
+            const li = document.createElement('li');
+            li.className = active ? 'active' : '';
+            li.innerHTML = `<strong>${name}</strong><br><span style="color:#aaa; font-size:12px;">${active ? desc : 'Ikke aktiv'}</span>`;
+            list.appendChild(li);
+        }
+
+        addGeneItem('Flagel', cell.genes.flagellum, 'Høj fart (2.0), Dyr drift');
+        addGeneItem('Cilier', cell.genes.cilia, 'Bedre kontrol, Medium drift');
+        addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
+        addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
+    } else {
+        // Hvis ingen celle er aktiv (Observe Mode)
+        document.getElementById('inspAtpVal').innerText = "-";
+        document.getElementById('inspAminoVal').innerText = "-";
+        document.getElementById('inspGeneList').innerHTML = "<li><em>Observer Mode</em></li>";
     }
 
-    addGeneItem('Flagel', cell.genes.flagellum, 'Høj fart (2.0), Dyr drift');
-    addGeneItem('Cilier', cell.genes.cilia, 'Bedre kontrol, Medium drift');
-    addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
-    addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
+    // Population Counters
+    const playerCount = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
+    const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
+
+    document.getElementById('popPlayer').innerText = playerCount;
+    document.getElementById('popBacillus').innerText = bacillusCount;
 }
 
 function showInspectorSidebar(show) {
-    // Denne funktion bruges måske ikke mere hvis den altid er fremme,
-    // men vi beholder den for kompatibilitet eller reset
     const sidebar = document.getElementById('inspectorSidebar');
     // Sidebar håndteres nu via CSS (ingen hidden class)
 }
 
 function drawUI() {
-    // UI tegnes OVENPÅ alt (ingen camera transform her da vi resetter context før kald)
+    // UI tegnes OVENPÅ alt
 
-    // ATP Bar (Flyt til venstre eller fjern hvis sidebar har det hele? 
-    // Brugeren bad om sidebar med stats, så måske er bunden overflødig?
-    // Beholder bottom-bar for nem overblik, men opdaterer positioner hvis nødvendigt)
+    if (activeCell) {
+        // ATP Bar
+        ctx.fillStyle = '#333';
+        ctx.fillRect(20, canvas.height - 40, 200, 20);
+        const atpWidth = (activeCell.atp / activeCell.maxAtp) * 200;
+        ctx.fillStyle = '#FFC107';
+        ctx.fillRect(20, canvas.height - 40, atpWidth, 20);
+        ctx.fillStyle = '#FFF';
+        ctx.font = '12px Arial';
+        ctx.fillText(`ATP: ${Math.floor(activeCell.atp)}`, 25, canvas.height - 25);
 
-    // ... Beholder eksisterende bund UI for nu, medmindre brugeren bad om at fjerne det.
-    // Brugeren sagde "Inspect vinduet om til sidebar", men hoved-UI i bunden er måske stadig rart.
+        // Amino Bar
+        ctx.fillStyle = '#333';
+        ctx.fillRect(20, canvas.height - 70, 200, 20);
+        const aminoWidth = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 200;
 
-    // ATP Bar
-    ctx.fillStyle = '#333';
-    ctx.fillRect(20, canvas.height - 40, 200, 20);
-    const atpWidth = (activeCell.atp / activeCell.maxAtp) * 200;
-    ctx.fillStyle = '#FFC107';
-    ctx.fillRect(20, canvas.height - 40, atpWidth, 20);
-    ctx.fillStyle = '#FFF';
-    ctx.font = '12px Arial';
-    ctx.fillText(`ATP: ${Math.floor(activeCell.atp)}`, 25, canvas.height - 25);
+        if (activeCell.aminoAcids >= activeCell.maxAminoAcids) {
+            ctx.fillStyle = '#00E676';
+            ctx.fillText("TRYK 'D' FOR AT DELE DIG", 230, canvas.height - 55);
+        } else {
+            ctx.fillStyle = '#2196F3';
+        }
+        ctx.fillRect(20, canvas.height - 70, aminoWidth, 20);
 
-    // Amino Bar
-    ctx.fillStyle = '#333';
-    ctx.fillRect(20, canvas.height - 70, 200, 20);
-    const aminoWidth = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 200;
-
-    if (activeCell.aminoAcids >= activeCell.maxAminoAcids) {
-        ctx.fillStyle = '#00E676';
-        ctx.fillText("TRYK 'D' FOR AT DELE DIG", 230, canvas.height - 55);
+        ctx.fillStyle = '#FFF';
+        ctx.fillText(`Vækst: ${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`, 25, canvas.height - 55);
     } else {
-        ctx.fillStyle = '#2196F3';
+        // OBSERVE MODE UI Overlay
+        ctx.fillStyle = 'rgba(171, 71, 188, 0.2)';
+        ctx.fillRect(0, canvas.height - 80, 250, 80);
+        ctx.fillStyle = '#E1BEE7';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText("👁 OBSERVER MODE", 20, canvas.height - 50);
+        ctx.font = '12px Arial';
+        ctx.fillText("Klik på en celle for at overtage styringen", 20, canvas.height - 30);
     }
-    ctx.fillRect(20, canvas.height - 70, aminoWidth, 20);
 
     ctx.fillStyle = '#FFF';
-    ctx.fillText(`Vækst: ${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`, 25, canvas.height - 55);
-    ctx.fillText(`Generation: ${generation} | Celler i alt: ${otherCells.length + 1}`, 20, 30);
+    ctx.fillText(`Generation: ${generation} | Celler i alt: ${otherCells.length + (activeCell ? 1 : 0)}`, 20, 30);
 
-    // Debug info om verden - Flyttet lidt ned da knapperne er i venstre hjørne
+    // Debug info om verden
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
     ctx.fillText(`World: ${worldWidth}x${worldHeight} | Cam: ${Math.floor(camera.x)},${Math.floor(camera.y)}`, 20, 70);
-
 
     if (isPaused && !isInspecting) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -407,15 +501,23 @@ function drawUI() {
 }
 
 function updateCamera() {
-    if (!activeCell) return;
+    if (activeCell) {
+        // Center kamera på spilleren
+        camera.x = activeCell.x - canvas.width / 2;
+        camera.y = activeCell.y - canvas.height / 2;
+    } else {
+        // RTS Style Edge Scrolling
+        const edgeSize = 50;
+        const speed = 15;
 
-    // Center kamera på spilleren
-    camera.x = activeCell.x - canvas.width / 2;
-    camera.y = activeCell.y - canvas.height / 2;
+        if (mouse.x < edgeSize) camera.x -= speed;
+        if (mouse.x > canvas.width - edgeSize) camera.x += speed;
+        if (mouse.y < edgeSize) camera.y -= speed;
+        if (mouse.y > canvas.height - edgeSize) camera.y += speed;
+    }
 
     if (isNaN(camera.x) || isNaN(camera.y)) {
-        console.error("CAMERA IS NAN! ActiveCell:", activeCell);
-        // Nød-fix
+        console.error("CAMERA IS NAN!", camera);
         camera.x = 0;
         camera.y = 0;
     }
@@ -454,11 +556,14 @@ function gameLoop() {
         updateCamera();
 
         // SIMULATION (Brug verdens-dimensioner og verdens-mus)
-        activeCell.update(worldMouse, keys, worldWidth, worldHeight);
+        if (activeCell) {
+            activeCell.update(worldMouse, keys, worldWidth, worldHeight);
+            checkCollisions(activeCell);
+            handleDivision();
+        }
+
         otherCells.forEach(cell => checkCollisions(cell));
         updateEnvironment(worldWidth, worldHeight);
-        checkCollisions(activeCell);
-        handleDivision();
     }
 
     // 2. Tegning - Verden (Med Kamera Transform)
@@ -478,10 +583,8 @@ function gameLoop() {
     // 3. Tegning - UI (Ingen Transform - tegnes fast på skærmen)
     drawUI();
 
-    // Sidebaren opdateres hver frame (altid aktiv nu)
-    if (activeCell) {
-        updateInspectorSidebar(activeCell);
-    }
+    // Sidebaren opdateres hver frame (altid aktiv nu) (Send activeCell eller null)
+    updateInspectorSidebar(activeCell);
 
     requestAnimationFrame(gameLoop);
 }

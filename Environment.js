@@ -121,7 +121,7 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
             // Bacillus Division
             if (cell.isBacillus && cell.aminoAcids >= 3) {
                 // Tjek max antal (50)
-                const bacillusCount = otherCells.filter(c => c.isBacillus).length;
+                const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
                 if (bacillusCount < 50) {
                     const bx = cell.x + 20;
                     const by = cell.y + 20;

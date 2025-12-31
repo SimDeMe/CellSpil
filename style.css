@@ -146,6 +146,11 @@ button:hover {
     background: #00E676;
 }
 
+button.active-observe {
+    background: rgba(171, 71, 188, 0.3);
+    box-shadow: 0 0 10px rgba(171, 71, 188, 0.5);
+}
+
 #inspGeneList {
     list-style: none;
     padding: 0;
