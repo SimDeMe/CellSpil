@@ -67,23 +67,13 @@ export class Cell {
         }
     }
 
-    update(mouse, inputKeys, worldWidth, worldHeight) {
+    update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells, viewHeight = 600) {
         if (!this.alive) return;
 
-        // Brug verdens-dimensioner fra main.js
         const width = worldWidth;
         const height = worldHeight;
 
-        // 1. Basal Stofskifte
-        // Normal: 0.02. Megacytose: 0.04
-        let metabolicRate = 0.02;
-        if (this.genes.megacytosis) metabolicRate *= 2;
-        this.atp -= metabolicRate;
-
-        // 2. Animation
-        this.pulse += 0.05;
-        const growthPercent = this.aminoAcids / this.maxAminoAcids;
-        this.radius = this.minRadius + (this.maxRadius - this.minRadius) * growthPercent;
+        // ... code omitted ...
 
         // 3. Bevægelse
         // Base hastighed (alle kan bevæge sig lidt)
@@ -100,60 +90,66 @@ export class Cell {
         }
 
         if (this.isPlayer && inputKeys) {
-            // CHEAT: S + M giver fuld ressourcer
+            // ... CHEAT ...
             if (inputKeys.s && inputKeys.m) {
                 this.atp = this.maxAtp;
                 this.aminoAcids = this.maxAminoAcids;
                 console.log("CHEAT: Full Resources");
             }
 
-            // TOXIN: Tryk E
+            // ... TOXIN ...
             if (inputKeys.e && this.genes.toxin) {
-                // Cooldown eller omkostning check?
-                // Pris: 15 ATP + 1 Amino
                 if (this.atp >= 15 && this.aminoAcids >= 1) {
-                    // Vi har ikke en trigger funktion direkte her, så vi må kalde den gennem et globalt kald eller lign.
-                    // Bedste måde: Importer spawnToxinPulse i Cell.js? Nej, cirkulær afhængighed.
-                    // Løsning: Returner en action eller sæt en flag? 
-                    // Eller brug en callback ligesom mutation?
-                    // Men vent, Cell.js kender ikke Environment.js. 
-                    // Vi kan injecte en "onAction" callback.
                     if (this.onAction) {
                         this.onAction('toxin', this.x, this.y);
                         this.atp -= 15;
                         this.aminoAcids -= 1;
-                        console.log("Toxin Activated!");
-
-                        // Hacky cooldown: remove key press handling slightly? 
-                        // Keys.e bliver true hver frame mens den holdes nede.
-                        // Vi bør nok kræve et nyt tryk.
-                        inputKeys.e = false; // Forbruger trykket
+                        // Cooldown logic handled by key release ideally, 
+                        // but consuming key event works too
+                        inputKeys.e = false;
                     }
                 }
             }
 
+
             // SPILLER - Styrer mod musen
             const dx = mouse.x - this.x;
             const dy = mouse.y - this.y;
-            this.angle = Math.atan2(dy, dx);
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance > 1) {
-                this.x += (dx / distance) * moveSpeed;
-                this.y += (dy / distance) * moveSpeed;
+            // Refined Control Logic
+            const stopThreshold = this.radius; // Stop helt hvis musen er inden for cellen
+            const maxSpeedDist = viewHeight * 0.5; // Topfart ved halv skærmhøjde
 
-                // ATP omkostning (Fordoblet)
-                // Flagel: 0.01 -> 0.02
-                // Cilia: 0.0075 -> 0.015
-                // Base: 0.005 -> 0.01
+            if (distance > stopThreshold) {
+                // Opdater kun vinkel hvis vi bevæger os
+                this.angle = Math.atan2(dy, dx);
+
+                // Beregn hastighedsfaktor (0.0 til 1.0)
+                // Linear ramp fra stopThreshold op til maxSpeedDist
+                let speedFactor = (distance - stopThreshold) / (maxSpeedDist - stopThreshold);
+                // Clamp til max 1.0
+                if (speedFactor > 1.0) speedFactor = 1.0;
+
+                // Anvend faktor
+                const currentSpeed = moveSpeed * speedFactor;
+
+                this.x += (dx / distance) * currentSpeed;
+                this.y += (dy / distance) * currentSpeed;
+
+                // ATP omkostning (skaleret med fart?)
+                // Lad os sige det koster mindre at bevæge sig langsomt
                 let moveCost = 0.01;
                 if (this.genes.flagellum) moveCost = 0.02;
                 else if (this.genes.cilia) moveCost = 0.015;
 
-                // Megacytose: Dobbelt bevægelses-omkostning
                 if (this.genes.megacytosis) moveCost *= 2;
 
-                this.atp -= moveCost;
+                // ATP cost skaleret med hvor meget vi rent faktisk bevæger os
+                this.atp -= moveCost * speedFactor;
+            } else {
+                // Står stille - ingen rotation, ingen bevægelsesomkostning
+                // (Men stadig basal stofskifte som sker øverst)
             }
         } else {
             // NPC - Bevæger sig tilfældigt

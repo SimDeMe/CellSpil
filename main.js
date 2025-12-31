@@ -557,7 +557,8 @@ function gameLoop() {
 
         // SIMULATION (Brug verdens-dimensioner og verdens-mus)
         if (activeCell) {
-            activeCell.update(worldMouse, keys, worldWidth, worldHeight);
+            // Vi sender canvas.height med som 'viewHeight' for at beregne musens afstand ift skærmstørrelse
+            activeCell.update(worldMouse, keys, worldWidth, worldHeight, null, null, canvas.height);
             checkCollisions(activeCell);
             handleDivision();
         }
