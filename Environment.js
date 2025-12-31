@@ -459,3 +459,38 @@ export function checkCollisions(cell) {
         }
     }
 }
+
+// Elastisk Kollision Logic
+export function resolveCollisions(player, others) {
+    const allCells = [player, ...others];
+
+    for (let i = 0; i < allCells.length; i++) {
+        for (let j = i + 1; j < allCells.length; j++) {
+            const c1 = allCells[i];
+            const c2 = allCells[j];
+
+            if (!c1.alive || !c2.alive) continue; // Ingen kollision med døde
+
+            const dx = c2.x - c1.x;
+            const dy = c2.y - c1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = c1.radius + c2.radius;
+
+            if (dist < minDist) {
+                // Kollision!
+
+                // 1. Skub dem fra hinanden (Position Correction) for at undgå overlap
+                const angle = Math.atan2(dy, dx);
+                const overlap = minDist - dist;
+                const pushX = Math.cos(angle) * overlap * 0.5;
+                const pushY = Math.sin(angle) * overlap * 0.5;
+
+                // Opdater positioner direkte
+                c1.x -= pushX;
+                c1.y -= pushY;
+                c2.x += pushX;
+                c2.y += pushY;
+            }
+        }
+    }
+}
