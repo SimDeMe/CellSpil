@@ -17,6 +17,8 @@ export class Cell {
         this.baseMaxAmino = 3;
         this.aminoCostCilia = 2;
         this.aminoCostFlagellum = 3;
+        this.aminoCostMegacytosis = 5;
+        this.aminoCostToxin = 1;
 
         this.maxAminoAcids = this.baseMaxAmino; // Bliver opdateret af updateMaxGrowth()
 
@@ -30,7 +32,9 @@ export class Cell {
         // Gener
         this.genes = {
             flagellum: false,
-            cilia: false
+            cilia: false,
+            megacytosis: false,
+            toxin: false
         };
 
         // Opdater hvis vi starter med gener (fx gemt spil)
@@ -39,6 +43,8 @@ export class Cell {
         // NPC Bevægelse
         this.moveAngle = Math.random() * Math.PI * 2;
         this.angle = 0;
+
+        this.onAction = null; // Callback for abilities
     }
 
     // Ny metode til at genberegne krav baseret på gener
@@ -46,7 +52,19 @@ export class Cell {
         let cost = this.baseMaxAmino;
         if (this.genes.cilia) cost += this.aminoCostCilia;
         if (this.genes.flagellum) cost += this.aminoCostFlagellum;
+        if (this.genes.megacytosis) cost += this.aminoCostMegacytosis;
+        if (this.genes.toxin) cost += this.aminoCostToxin;
         this.maxAminoAcids = cost;
+
+        // Megacytose effekt på størrelse (Instant update ved init)
+        if (this.genes.megacytosis) {
+            this.minRadius = 40; // 2x normal (20)
+            this.maxRadius = 56; // 2x normal (28)
+            this.radius = this.minRadius;
+        } else {
+            this.minRadius = 20;
+            this.maxRadius = 28;
+        }
     }
 
     update(mouse, inputKeys, worldWidth, worldHeight) {
@@ -56,8 +74,11 @@ export class Cell {
         const width = worldWidth;
         const height = worldHeight;
 
-        // 1. Basal Stofskifte (Fordoblet)
-        this.atp -= 0.02;
+        // 1. Basal Stofskifte
+        // Normal: 0.02. Megacytose: 0.04
+        let metabolicRate = 0.02;
+        if (this.genes.megacytosis) metabolicRate *= 2;
+        this.atp -= metabolicRate;
 
         // 2. Animation
         this.pulse += 0.05;
@@ -67,6 +88,9 @@ export class Cell {
         // 3. Bevægelse
         // Base hastighed (alle kan bevæge sig lidt)
         let moveSpeed = 0.4; // Tunet til ca. 30-40 sekunder for krydsning
+
+        // Megacytose: Halv fart
+        if (this.genes.megacytosis) moveSpeed *= 0.5;
 
         // Modifiers fra gener
         if (this.genes.flagellum) {
@@ -83,6 +107,31 @@ export class Cell {
                 console.log("CHEAT: Full Resources");
             }
 
+            // TOXIN: Tryk E
+            if (inputKeys.e && this.genes.toxin) {
+                // Cooldown eller omkostning check?
+                // Pris: 15 ATP + 1 Amino
+                if (this.atp >= 15 && this.aminoAcids >= 1) {
+                    // Vi har ikke en trigger funktion direkte her, så vi må kalde den gennem et globalt kald eller lign.
+                    // Bedste måde: Importer spawnToxinPulse i Cell.js? Nej, cirkulær afhængighed.
+                    // Løsning: Returner en action eller sæt en flag? 
+                    // Eller brug en callback ligesom mutation?
+                    // Men vent, Cell.js kender ikke Environment.js. 
+                    // Vi kan injecte en "onAction" callback.
+                    if (this.onAction) {
+                        this.onAction('toxin', this.x, this.y);
+                        this.atp -= 15;
+                        this.aminoAcids -= 1;
+                        console.log("Toxin Activated!");
+
+                        // Hacky cooldown: remove key press handling slightly? 
+                        // Keys.e bliver true hver frame mens den holdes nede.
+                        // Vi bør nok kræve et nyt tryk.
+                        inputKeys.e = false; // Forbruger trykket
+                    }
+                }
+            }
+
             // SPILLER - Styrer mod musen
             const dx = mouse.x - this.x;
             const dy = mouse.y - this.y;
@@ -93,14 +142,18 @@ export class Cell {
                 this.x += (dx / distance) * moveSpeed;
                 this.y += (dy / distance) * moveSpeed;
 
-                // ATP omkostning (kun for ekstra fart)
                 // ATP omkostning (Fordoblet)
                 // Flagel: 0.01 -> 0.02
                 // Cilia: 0.0075 -> 0.015
                 // Base: 0.005 -> 0.01
-                if (this.genes.flagellum) this.atp -= 0.02;
-                else if (this.genes.cilia) this.atp -= 0.015;
-                else this.atp -= 0.01;
+                let moveCost = 0.01;
+                if (this.genes.flagellum) moveCost = 0.02;
+                else if (this.genes.cilia) moveCost = 0.015;
+
+                // Megacytose: Dobbelt bevægelses-omkostning
+                if (this.genes.megacytosis) moveCost *= 2;
+
+                this.atp -= moveCost;
             }
         } else {
             // NPC - Bevæger sig tilfældigt
@@ -108,7 +161,10 @@ export class Cell {
             const npcSpeed = moveSpeed * 0.5; // NPC'er er lidt langsommere
             this.x += Math.cos(this.moveAngle) * npcSpeed;
             this.y += Math.sin(this.moveAngle) * npcSpeed;
-            this.atp -= 0.01; // Fordoblet NPC cost
+
+            let npcCost = 0.01;
+            if (this.genes.megacytosis) npcCost *= 2;
+            this.atp -= npcCost;
         }
 
         // 4. Brownske bevægelser (Simpel jitter)

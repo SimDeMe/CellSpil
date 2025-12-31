@@ -1,4 +1,5 @@
 import { Cell } from './Cell.js';
+import { Bacillus } from './Bacillus.js';
 
 export const foodParticles = [];
 export const otherCells = [];
@@ -6,12 +7,87 @@ export const otherCells = [];
 const maxFood = 1500;
 let spawnTimer = 0;
 
+let onMutationCallback = null;
+
+export function setMutationCallback(callback) {
+    onMutationCallback = callback;
+}
+
 export function initEnvironment(canvasWidth, canvasHeight) {
     foodParticles.length = 0;
     otherCells.length = 0;
 
+    // Spawn Mad
     for (let i = 0; i < 500; i++) {
         spawnFood(canvasWidth, canvasHeight);
+    }
+}
+
+export function triggerInvasion(canvasWidth, canvasHeight) {
+    // Spawn Bacillus (20 stk)
+    for (let i = 0; i < 20; i++) {
+        const bx = Math.random() * canvasWidth;
+        const by = Math.random() * canvasHeight;
+        const bac = new Bacillus(bx, by);
+        otherCells.push(bac);
+    }
+}
+
+// Toxin System
+export const toxinParticles = [];
+
+export function spawnToxinPulse(x, y) {
+    // Spawn 20 partikler i en cirkel
+    for (let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 / 20) * i;
+        toxinParticles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * 3, // Hurtig spredning
+            vy: Math.sin(angle) * 3,
+            life: 120, // 2 sekunder ved 60fps
+            maxLife: 120
+        });
+    }
+}
+
+function updateToxinParticles(canvasWidth, canvasHeight) {
+    for (let i = toxinParticles.length - 1; i >= 0; i--) {
+        const p = toxinParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+
+        // Fjern døde
+        if (p.life <= 0) {
+            toxinParticles.splice(i, 1);
+            continue;
+        }
+
+        // Tjek kollision med andre celler (især Bacillus)
+        for (let j = otherCells.length - 1; j >= 0; j--) {
+            const cell = otherCells[j];
+            if (!cell.alive) continue;
+
+            const dx = p.x - cell.x;
+            const dy = p.y - cell.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < cell.radius) {
+                // Skade!
+                if (cell.isBacillus) {
+                    cell.kill();
+                    console.log("Bacillus dræbt af toxin!");
+                } else {
+                    // Hvis det er en normal celle, skader vi den måske lidt?
+                    // For nu, kun Bacillus dør instant.
+                }
+                // Partiklen forsvinder ved ramt (eller skal den fortsætte?)
+                // Lad os fjerne den for impact-følelse
+                toxinParticles.splice(i, 1);
+                break; // Stop loopet for denne partikel
+            }
+        }
     }
 }
 
@@ -21,6 +97,8 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
         spawnFood(canvasWidth, canvasHeight);
         spawnTimer = 0;
     }
+
+    updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
 
     // Diffusion for næring
     foodParticles.forEach(food => {
@@ -55,25 +133,43 @@ export function spawnSisterCell(x, y, motherGenes = null) {
         sister.genes = { ...motherGenes };
     }
 
-    // Mutation: 20% chance for en ny mutation
-    if (Math.random() < 0.2) {
+    // Mutation: 40% chance for en ny mutation (FREMADRETTET)
+    let mutated = false;
+    if (Math.random() < 0.4) {
         // Liste af mulige mutationer som cellen ikke har endnu
         const possibleMutations = [];
-        if (!sister.genes.cilia && !sister.genes.flagellum) {
-            // Hvis man ingen bevægelse har, kan man få cilier eller flagel
-            possibleMutations.push('cilia');
-            possibleMutations.push('flagellum');
-        } else if (sister.genes.cilia && !sister.genes.flagellum) {
-            // Hvis man har cilier, kan man opgradere til flagel
-            possibleMutations.push('flagellum');
-        }
+        const g = sister.genes;
+
+        // Bevægelse
+        if (!g.cilia && !g.flagellum) possibleMutations.push('cilia', 'flagellum');
+        else if (g.cilia && !g.flagellum) possibleMutations.push('flagellum');
+
+        // Nye gener
+        if (!g.megacytosis) possibleMutations.push('megacytosis');
+        if (!g.toxin) possibleMutations.push('toxin');
 
         if (possibleMutations.length > 0) {
             const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
             sister.genes[newMutation] = true;
-            // Hvis vi får flagel, overskriver det cilier (funktionelt) eller vi kan beholde begge,
-            // men logikken i Cell.js prioriterer flagel.
+            mutated = true;
+
             console.log("MUTATION! Ny gen: " + newMutation);
+
+            // Trigger UI popup hvis callback er sat
+            if (onMutationCallback) {
+                onMutationCallback(newMutation);
+            }
+        }
+    }
+
+    // Tilbagemutation: 20% chance for at MISTE et gen (hvis vi ikke lige har fået et)
+    if (!mutated && Math.random() < 0.2) {
+        const activeGenes = Object.keys(sister.genes).filter(k => sister.genes[k]);
+        if (activeGenes.length > 0) {
+            const lostGene = activeGenes[Math.floor(Math.random() * activeGenes.length)];
+            sister.genes[lostGene] = false;
+            console.log("BACK-MUTATION! Mistet gen: " + lostGene);
+            // Evt. popup for tabt gen? For nu nøjes vi med log.
         }
     }
 
@@ -135,6 +231,16 @@ export function drawEnvironment(ctx) {
         else ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
         ctx.fillStyle = food.color;
         ctx.fill();
+    });
+
+    // Tegn Toxin
+    toxinParticles.forEach(p => {
+        ctx.globalAlpha = p.life / p.maxLife; // Fade out
+        ctx.fillStyle = '#00E676';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
     });
 
     otherCells.forEach(cell => {

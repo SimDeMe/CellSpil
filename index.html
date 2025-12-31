@@ -1,19 +1,63 @@
 <!DOCTYPE html>
 <html lang="da">
+
 <head>
     <meta charset="UTF-8">
     <title>Celle Evolution Sim</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-   <div id="ui-layer">
-    <button id="pauseBtn">⏸ PAUSE</button>
-    <button id="resetBtn">🔄 RESET</button>
-    <button id="inspectBtn">🔍 INSPECT</button>
-    <button id="apoBtn" style="border-color: #ff5252; color: #ff5252;">☠ APOPTOSE</button>
-</div>
+    <div id="ui-layer">
+        <button id="pauseBtn">⏸ PAUSE</button>
+        <button id="resetBtn">🔄 RESET</button>
+        <button id="inspectBtn">🔍 INSPECT</button>
+        <button id="apoBtn" style="border-color: #ff5252; color: #ff5252;">☠ APOPTOSE</button>
+
+        <!-- Mutation Popup -->
+        <div id="mutationPopup" class="hidden">
+            <h2 id="mutTitle">Mutation!</h2>
+            <p id="mutDesc">Beskrivelse</p>
+            <p id="mutCost" class="cost">Cost</p>
+        </div>
+    </div>
+
+    <!-- Inspector Sidebar (Always Active) -->
+    <div id="inspectorSidebar">
+        <canvas id="minimapCanvas" width="200" height="200"></canvas>
+        <h2>🔬 Status</h2>
+        <div class="sidebar-content">
+            <div class="stat-group">
+                <label>Generation:</label> <span id="inspGen">0</span>
+            </div>
+            <div class="stat-group">
+                <label>ATP:</label>
+                <div class="bar-container">
+                    <div id="inspAtpBar" class="bar"></div>
+                </div>
+                <span id="inspAtpVal">0/0</span>
+            </div>
+            <div class="stat-group">
+                <label>Vækst:</label>
+                <div class="bar-container">
+                    <div id="inspAminoBar" class="bar amino"></div>
+                </div>
+                <span id="inspAminoVal">0/0</span>
+            </div>
+
+            <h3>Gener</h3>
+            <ul id="inspGeneList">
+                <!-- Populated by JS -->
+            </ul>
+
+            <div class="notice">
+                Tryk 'I' igen for at lukke
+            </div>
+        </div>
+    </div>
 
     <canvas id="gameCanvas"></canvas>
     <script type="module" src="main.js"></script>
 </body>
+
 </html>

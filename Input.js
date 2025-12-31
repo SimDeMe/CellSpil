@@ -8,7 +8,8 @@ export const keys = {
     d: false,  // Deling
     i: false,  // Inspektion
     s: false,  // Cheat
-    m: false   // Cheat
+    m: false,  // Cheat
+    e: false   // Toxin
 };
 
 
@@ -33,11 +34,13 @@ export function initInput() {
         if (e.code === 'KeyD') keys.d = true;
         if (e.code === 'KeyS') keys.s = true;
         if (e.code === 'KeyM') keys.m = true;
+        if (e.code === 'KeyE') keys.e = true;
     });
 
     window.addEventListener('keyup', (e) => {
         if (e.code === 'KeyD') keys.d = false;
         if (e.code === 'KeyS') keys.s = false;
         if (e.code === 'KeyM') keys.m = false;
+        if (e.code === 'KeyE') keys.e = false;
     });
 }

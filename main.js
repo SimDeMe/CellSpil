@@ -3,7 +3,8 @@ import { activeCell, initPlayer, setActiveCell } from './Player.js';
 import {
     initEnvironment, updateEnvironment, drawEnvironment,
     checkCollisions, spawnSisterCell, otherCells,
-    getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment
+    getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
+    setMutationCallback, triggerInvasion, spawnToxinPulse
 } from './Environment.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -26,6 +27,8 @@ const camera = {
 let isPaused = false;
 let isInspecting = false;
 let generation = 1;
+let gameStartTime = Date.now();
+let invasionTriggered = false;
 
 // --- KNAPPER OG HÅNDTERING ---
 try {
@@ -67,17 +70,22 @@ function toggleInspect() {
         togglePause();
     }
     isInspecting = !isInspecting;
-    console.log("Inspektion: " + isInspecting);
+
+    // Vis/Skjul sidebar
+    showInspectorSidebar(isInspecting);
 }
 
 function resetGame() {
     generation = 1;
     isPaused = false;
     isInspecting = false;
+    showInspectorSidebar(false); // Skjul
     const btn = document.getElementById('pauseBtn');
     if (btn) btn.innerText = "⏸ PAUSE";
     init();
 }
+
+// ... (Resten af filen)
 
 function triggerApoptosis() {
     if (activeCell && activeCell.alive) {
@@ -86,12 +94,100 @@ function triggerApoptosis() {
     }
 }
 
+// --- MUTATION POPUP ---
+function showMutationPopup(mutationType) {
+    const popup = document.getElementById('mutationPopup');
+    const title = document.getElementById('mutTitle');
+    const desc = document.getElementById('mutDesc');
+    const cost = document.getElementById('mutCost');
+
+    popup.classList.remove('hidden');
+    popup.style.opacity = '1';
+    popup.style.display = 'block';
+
+    if (mutationType === 'flagellum') {
+        title.innerText = "Ny Mutation: Flagel!";
+        desc.innerText = "En lang hale der giver kraftig fremdrift.";
+        cost.innerText = "PRIS: +3 Vækst, 2x ATP forbrug";
+    } else if (mutationType === 'cilia') {
+        title.innerText = "Ny Mutation: Cilier!";
+        desc.innerText = "Små fimrehår der giver bedre kontrol.";
+        cost.innerText = "PRIS: +2 Vækst, 1.5x ATP forbrug";
+    } else if (mutationType === 'megacytosis') {
+        title.innerText = "Ny Mutation: Megacytose!";
+        desc.innerText = "Du vokser til dobbelt størrelse! Mere HP, men langsommere.";
+        cost.innerText = "PRIS: +5 Vækst, 2x ATP (Stofskifte & Bevægelse), ½ Fart";
+    } else if (mutationType === 'toxin') {
+        title.innerText = "Ny Mutation: Toxin!";
+        desc.innerText = "Tryk 'E' for at udskille gift der dræber konkurrenter.";
+        cost.innerText = "PRIS: +1 Vækst, 15 ATP pr. skud";
+    }
+
+    // Skjul efter 5 sekunder
+    setTimeout(() => {
+        popup.style.opacity = '0';
+        setTimeout(() => {
+            popup.classList.add('hidden');
+            popup.style.display = 'none';
+        }, 500);
+    }, 5000);
+}
+
+// --- EVENT POPUP ---
+function showEventPopup(titleText, descText, costText) {
+    const popup = document.getElementById('mutationPopup');
+    const title = document.getElementById('mutTitle');
+    const desc = document.getElementById('mutDesc');
+    const cost = document.getElementById('mutCost');
+
+    title.innerText = titleText;
+    desc.innerText = descText;
+    cost.innerText = costText; // Bruges som subtext/råd her
+
+    // Styling til event (lidt anderledes farve?)
+    title.style.color = '#FF5252'; // Rød alarm
+    popup.style.borderColor = '#FF5252';
+
+    popup.classList.remove('hidden');
+    popup.style.opacity = '1';
+    popup.style.display = 'block';
+
+    // Skjul efter 8 sekunder (lidt længere tid)
+    setTimeout(() => {
+        popup.style.opacity = '0';
+        setTimeout(() => {
+            popup.classList.add('hidden');
+            popup.style.display = 'none';
+            // Reset styles
+            title.style.color = '#69F0AE';
+            popup.style.borderColor = '#69F0AE';
+        }, 500);
+    }, 8000);
+}
+
 // Første gang spillet starter
 function init() {
     initInput();
     // Vi initialiserer spilleren i midten af den store verden
     initPlayer(worldWidth, worldHeight);
+
+    // Setup Action Callback for Player
+    if (activeCell) {
+        activeCell.onAction = (action, x, y) => {
+            if (action === 'toxin') {
+                spawnToxinPulse(x, y);
+            }
+        };
+    }
+
     initEnvironment(worldWidth, worldHeight);
+
+    // Reset timere
+    gameStartTime = Date.now();
+    invasionTriggered = false;
+
+    // Register callback for mutationer
+    setMutationCallback(showMutationPopup);
 }
 
 function handleCellSwitch() {
@@ -107,6 +203,10 @@ function handleCellSwitch() {
             addCellToEnvironment(oldPlayer);
             removeCellFromEnvironment(clickedCell);
             setActiveCell(clickedCell);
+
+            // Overfør callback
+            clickedCell.onAction = oldPlayer.onAction;
+            oldPlayer.onAction = null;
 
             mouse.clicked = false;
         }
@@ -126,157 +226,107 @@ function handleDivision() {
 }
 
 // --- MINIMAP FUNKTION ---
+// --- MINIMAP FUNKTION ---
 function drawMinimap() {
-    const mapSize = 200; // Pixel størrelse på skærmen
-    const scale = mapSize / Math.max(worldWidth, worldHeight);
+    const miniCanvas = document.getElementById('minimapCanvas');
+    if (!miniCanvas) return;
+    const miniCtx = miniCanvas.getContext('2d');
 
-    const margin = 20;
-    const mapX = canvas.width - mapSize - margin;
-    const mapY = canvas.height - mapSize - margin;
+    // Ryd canvas
+    miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+
+    const scale = miniCanvas.width / Math.max(worldWidth, worldHeight);
 
     // 1. Baggrund
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(mapX, mapY, mapSize, mapSize);
+    miniCtx.fillStyle = '#000';
+    miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
 
-    // 2. Kant
-    ctx.strokeStyle = '#FFF';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+    // 2. Grænser (Verden)
+    const mapW = worldWidth * scale;
+    const mapH = worldHeight * scale;
+    miniCtx.strokeStyle = '#333';
+    miniCtx.lineWidth = 1;
+    miniCtx.strokeRect(0, 0, mapW, mapH);
 
     // 3. Andre celler
-    ctx.fillStyle = '#FF5252'; // Rødlig for fjender/NPC
+    miniCtx.fillStyle = '#FF5252';
     otherCells.forEach(cell => {
-        const cx = mapX + cell.x * scale;
-        const cy = mapY + cell.y * scale;
-        // Tegn kun hvis indenfor kortet (burde de altid være)
-        ctx.beginPath();
-        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-        ctx.fill();
+        const cx = cell.x * scale;
+        const cy = cell.y * scale;
+        miniCtx.beginPath();
+        miniCtx.arc(cx, cy, 2, 0, Math.PI * 2);
+        miniCtx.fill();
     });
 
     // 4. Spilleren
     if (activeCell) {
-        ctx.fillStyle = '#69F0AE'; // Grøn
-        const px = mapX + activeCell.x * scale;
-        const py = mapY + activeCell.y * scale;
-        ctx.beginPath();
-        ctx.arc(px, py, 3, 0, Math.PI * 2);
-        ctx.fill();
+        miniCtx.fillStyle = '#69F0AE'; // Grøn
+        const px = activeCell.x * scale;
+        const py = activeCell.y * scale;
+        miniCtx.beginPath();
+        miniCtx.arc(px, py, 3, 0, Math.PI * 2);
+        miniCtx.fill();
     }
 
-    // 5. Kamera Viewport (Hvid firkant)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 1;
-    const camRectX = mapX + camera.x * scale;
-    const camRectY = mapY + camera.y * scale;
+    // 5. Kamera Viewport
+    miniCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    miniCtx.lineWidth = 1;
+    const camRectX = camera.x * scale;
+    const camRectY = camera.y * scale;
     const camRectW = camera.width * scale;
     const camRectH = camera.height * scale;
-    ctx.strokeRect(camRectX, camRectY, camRectW, camRectH);
+    miniCtx.strokeRect(camRectX, camRectY, camRectW, camRectH);
 }
 
-// --- NY FUNKTION: Tegn Inspektion (RENSES FOR BILLEDE-TAGS) ---
-function drawInspectorWindow(cell) {
-    // Sørg for at alt fryser i inspektionsmode
-    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height); // Tegn overlay på skærmen (ikke verden)
+// --- NY SIDEBAR FUNKTION ---
+function updateInspectorSidebar(cell) {
+    // Opdater DOM elementer
+    document.getElementById('inspGen').innerText = generation;
 
-    const winWidth = 600;
-    const winHeight = 500;
-    const winX = canvas.width / 2 - winWidth / 2;
-    const winY = canvas.height / 2 - winHeight / 2;
+    // ATP
+    const atpPct = (cell.atp / cell.maxAtp) * 100;
+    document.getElementById('inspAtpBar').style.width = atpPct + '%';
+    document.getElementById('inspAtpVal').innerText = `${Math.floor(cell.atp)} / ${cell.maxAtp}`;
 
-    // Baggrund og kant
-    ctx.fillStyle = '#111';
-    ctx.fillRect(winX, winY, winWidth, winHeight);
-    ctx.strokeStyle = cell.color;
-    ctx.lineWidth = 5;
-    ctx.strokeRect(winX, winY, winWidth, winHeight);
+    // Amino
+    const aminoPct = (cell.aminoAcids / cell.maxAminoAcids) * 100;
+    document.getElementById('inspAminoBar').style.width = aminoPct + '%';
+    document.getElementById('inspAminoVal').innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
 
-    ctx.fillStyle = 'white';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText("🔬 DNA ANALYSE & MUTATIONER", winX + winWidth / 2, winY + 40);
+    // Gener Liste
+    const list = document.getElementById('inspGeneList');
+    list.innerHTML = ''; // Start forfra
 
-    // --- DNA CIRKEL ---
-    const circleX = winX + winWidth / 2;
-    const circleY = winY + winHeight / 2 - 20;
-    const circleR = 100;
-
-    ctx.beginPath();
-    ctx.arc(circleX, circleY, circleR, 0, Math.PI * 2);
-    ctx.lineWidth = 15;
-    ctx.strokeStyle = '#FF4081'; // DNA farve
-    ctx.stroke();
-
-    // Pynt på DNA
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(255, 64, 129, 0.5)';
-    for (let i = 0; i < 20; i++) {
-        const angle = (Math.PI * 2 / 20) * i;
-        const innerR = circleR - 7;
-        const outerR = circleR + 7;
-        ctx.beginPath();
-        ctx.moveTo(circleX + Math.cos(angle) * innerR, circleY + Math.sin(angle) * innerR);
-        ctx.lineTo(circleX + Math.cos(angle) * outerR, circleY + Math.sin(angle) * outerR);
-        ctx.stroke();
+    // Helper function
+    function addGeneItem(name, active, desc) {
+        const li = document.createElement('li');
+        li.className = active ? 'active' : '';
+        li.innerHTML = `<strong>${name}</strong><br><span style="color:#aaa; font-size:12px;">${active ? desc : 'Ikke aktiv'}</span>`;
+        list.appendChild(li);
     }
 
-    ctx.fillStyle = '#FFF';
-    ctx.font = '16px Arial';
-    ctx.fillText("DNA STRUKTUR", circleX, circleY + 5);
+    addGeneItem('Flagel', cell.genes.flagellum, 'Høj fart (2.0), Dyr drift');
+    addGeneItem('Cilier', cell.genes.cilia, 'Bedre kontrol, Medium drift');
+    addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
+    addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
+}
 
-    // --- GENER / MUTATIONER LISTE ---
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#FFF';
-    ctx.font = '18px Arial bold';
-    ctx.fillText("AKTIVE GENER:", winX + 40, winY + 100);
-
-    let geneY = winY + 140;
-
-    // Flagel
-    if (cell.genes.flagellum) {
-        ctx.fillStyle = '#69F0AE';
-        ctx.fillText("✅ Flagel (Svømning)", winX + 40, geneY);
-    } else {
-        ctx.fillStyle = '#555';
-        ctx.fillText("❌ Flagel (Ingen)", winX + 40, geneY);
-    }
-    geneY += 30;
-
-    // Cilier
-    if (cell.genes.cilia) {
-        ctx.fillStyle = '#69F0AE';
-        ctx.fillText("✅ Cilier (Langsom bevægelse)", winX + 40, geneY);
-    } else {
-        ctx.fillStyle = '#555';
-        ctx.fillText("❌ Cilier (Ingen)", winX + 40, geneY);
-    }
-    geneY += 30;
-
-    // --- HØJRE SIDE INFO ---
-    const infoX = winX + 350;
-    let infoY = winY + 100;
-    ctx.fillStyle = '#B3E5FC';
-    ctx.fillText("STATUS:", infoX, infoY);
-    infoY += 40;
-
-    ctx.font = '16px Arial';
-    ctx.fillStyle = '#FFF';
-    ctx.fillText(`Generation: ${generation}`, infoX, infoY);
-    infoY += 25;
-    ctx.fillText(`ATP: ${Math.floor(cell.atp)}/${cell.maxAtp}`, infoX, infoY);
-    infoY += 25;
-    ctx.fillText(`Aminosyrer: ${cell.aminoAcids}/${cell.maxAminoAcids}`, infoX, infoY);
-
-    // Luk knap info
-    ctx.font = '18px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#888';
-    ctx.fillText("Tryk 'I' eller 'INSPECT' for at lukke", canvas.width / 2, winY + winHeight - 20);
+function showInspectorSidebar(show) {
+    // Denne funktion bruges måske ikke mere hvis den altid er fremme,
+    // men vi beholder den for kompatibilitet eller reset
+    const sidebar = document.getElementById('inspectorSidebar');
+    // Sidebar håndteres nu via CSS (ingen hidden class)
 }
 
 function drawUI() {
     // UI tegnes OVENPÅ alt (ingen camera transform her da vi resetter context før kald)
+
+    // ATP Bar (Flyt til venstre eller fjern hvis sidebar har det hele? 
+    // Brugeren bad om sidebar med stats, så måske er bunden overflødig?
+    // Beholder bottom-bar for nem overblik, men opdaterer positioner hvis nødvendigt)
+
+    // ... Beholder eksisterende bund UI for nu, medmindre brugeren bad om at fjerne det.
+    // Brugeren sagde "Inspect vinduet om til sidebar", men hoved-UI i bunden er måske stadig rart.
 
     // ATP Bar
     ctx.fillStyle = '#333';
@@ -305,9 +355,9 @@ function drawUI() {
     ctx.fillText(`Vækst: ${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`, 25, canvas.height - 55);
     ctx.fillText(`Generation: ${generation} | Celler i alt: ${otherCells.length + 1}`, 20, 30);
 
-    // Debug info om verden
+    // Debug info om verden - Flyttet lidt ned da knapperne er i venstre hjørne
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.fillText(`World: ${worldWidth}x${worldHeight} | Cam: ${Math.floor(camera.x)},${Math.floor(camera.y)}`, 20, 50);
+    ctx.fillText(`World: ${worldWidth}x${worldHeight} | Cam: ${Math.floor(camera.x)},${Math.floor(camera.y)}`, 20, 70);
 
 
     if (isPaused && !isInspecting) {
@@ -319,7 +369,7 @@ function drawUI() {
         ctx.fillText("PAUSE", canvas.width / 2, canvas.height / 2);
     }
 
-    // Tegn Minimap til sidst i UI
+    // Tegn Minimap i sidebaren, ikke på main canvas
     drawMinimap();
 }
 
@@ -348,6 +398,18 @@ function gameLoop() {
     };
 
     if (!isPaused) {
+        // Tids-baserede events (Invasion efter 60 sekunder)
+        if (!invasionTriggered && Date.now() - gameStartTime > 60000) {
+            triggerInvasion(worldWidth, worldHeight);
+            invasionTriggered = true;
+            showEventPopup(
+                "ADVARSEL: INVASION!",
+                "Bacillus simplex er ankommet. De spiser alt din mad!",
+                "RÅD: Udvikl Toxin (E) eller bliv udkonkurreret!"
+            );
+            console.log("EVENT: Invasion triggered!");
+        }
+
         // Opdater kamera position FØR vi tegner
         updateCamera();
 
@@ -376,9 +438,9 @@ function gameLoop() {
     // 3. Tegning - UI (Ingen Transform - tegnes fast på skærmen)
     drawUI();
 
-    // Inspektion skal tegnes sidst, men kun hvis vi er i inspektionsmode
-    if (isInspecting) {
-        drawInspectorWindow(activeCell);
+    // Sidebaren opdateres hver frame (altid aktiv nu)
+    if (activeCell) {
+        updateInspectorSidebar(activeCell);
     }
 
     requestAnimationFrame(gameLoop);
