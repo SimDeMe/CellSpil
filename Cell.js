@@ -22,6 +22,7 @@ export class Cell {
         this.aminoCostMegacytosis = GameConfig.Player.mutationCosts.megacytosis;
         this.aminoCostToxin = GameConfig.Player.mutationCosts.toxin;
         this.aminoCostProtease = GameConfig.Player.mutationCosts.protease;
+        this.aminoCostHighTorque = GameConfig.Player.mutationCosts.highTorque;
 
         this.maxAminoAcids = this.baseMaxAmino; // Bliver opdateret af updateMaxGrowth()
 
@@ -38,7 +39,8 @@ export class Cell {
             cilia: false,
             megacytosis: false,
             toxin: false,
-            protease: false
+            protease: false,
+            highTorque: false
         };
 
         // Opdater hvis vi starter med gener (fx gemt spil)
@@ -59,6 +61,7 @@ export class Cell {
         if (this.genes.megacytosis) cost += this.aminoCostMegacytosis;
         if (this.genes.toxin) cost += this.aminoCostToxin;
         if (this.genes.protease) cost += this.aminoCostProtease;
+        if (this.genes.highTorque) cost += this.aminoCostHighTorque;
         this.maxAminoAcids = cost;
 
         // Megacytose effekt på størrelse (Instant update ved init)
@@ -84,12 +87,21 @@ export class Cell {
         // Base hastighed (alle kan bevæge sig lidt)
         let moveSpeed = 0.4; // Tunet til ca. 30-40 sekunder for krydsning
 
+        // Gen-specifikke omkostninger (Passive)
+        if (this.genes.megacytosis) this.atp -= 0.04;
+        if (this.genes.flagellum) this.atp -= 0.04;
+        if (this.genes.highTorque) this.atp -= 0.06; // Ekstra dyr i drift
+        if (this.genes.cilia) this.atp -= 0.02;
+
         // Megacytose: Halv fart
         if (this.genes.megacytosis) moveSpeed *= 0.5;
 
         // Modifiers fra gener
         if (this.genes.flagellum) {
             moveSpeed += 2.0; // Stor bonus
+            if (this.genes.highTorque) {
+                moveSpeed += 2.0; // Yderligere kæmpe bonus (Total +4.0)
+            }
         } else if (this.genes.cilia) {
             moveSpeed += 1.0; // Lille bonus
         }
@@ -156,11 +168,14 @@ export class Cell {
                 // ATP omkostning (skaleret med fart?)
                 // Lad os sige det koster mindre at bevæge sig langsomt
                 let moveCost = GameConfig.Player.moveCost;
-                if (this.genes.flagellum) moveCost = 0.02;
+                if (this.genes.flagellum) {
+                    moveCost = 0.02;
+                    if (this.genes.highTorque) moveCost = 0.05; // Meget dyrt
+                }
                 else if (this.genes.cilia) moveCost = 0.015;
 
-                if (this.genes.megacytosis) moveCost *= 2;
-
+                // Hvis vi bevæger os langsomt (speedFactor < 1), er det billigere?
+                // Ja, lad os belønne præcision
                 // ATP cost skaleret med hvor meget vi rent faktisk bevæger os
                 this.atp -= moveCost * speedFactor;
             } else {

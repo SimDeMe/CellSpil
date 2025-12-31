@@ -159,13 +159,17 @@ function showMutationPopup(mutationType, newCell = null) {
     popup.style.display = 'block';
 
     if (mutationType === 'flagellum') {
-        title.innerText = "Ny Mutation: Flagel!";
+        title.innerText = "Ny Mutation: Monotrichous!";
         desc.innerText = "En lang hale der giver kraftig fremdrift.";
         cost.innerText = "PRIS: +3 Aminosyrer, 2x ATP forbrug";
     } else if (mutationType === 'cilia') {
         title.innerText = "Ny Mutation: Cilier!";
         desc.innerText = "Små fimrehår der giver bedre kontrol.";
         cost.innerText = "PRIS: +2 Aminosyrer, 1.5x ATP forbrug";
+    } else if (mutationType === 'highTorque') {
+        title.innerText = "Ny Mutation: High-Torque Flagel!";
+        desc.innerText = "En super-tunet motor! Ekstrem fart.";
+        cost.innerText = "PRIS: +5 Aminosyrer, 3x ATP forbrug";
     } else if (mutationType === 'megacytosis') {
         title.innerText = "Ny Mutation: Megacytose!";
         desc.innerText = "Du vokser til dobbelt størrelse! Mere HP, men langsommere.";
@@ -371,19 +375,38 @@ function drawMinimap() {
         miniCtx.beginPath();
         miniCtx.arc(cx, cy, 2, 0, Math.PI * 2);
 
-        // Farv Bacillus orange, andre røde
-        miniCtx.fillStyle = cell.isBacillus ? '#FF9800' : '#FF5252';
+        // Farvelægning
+        if (!cell.alive) {
+            miniCtx.fillStyle = '#888'; // Lig (Grå)
+        } else if (cell.isBacillus) {
+            miniCtx.fillStyle = '#FFEB3B'; // Konkurrent (Gul)
+        } else if (cell.isPlayer || cell.genes) {
+            // Antager gamle spillerceller/børn er "grønne" eller ligner spilleren
+            // Men i Environment.js er otherCells bare dem der ikke er den aktive.
+            // Hvis vi vil have "Egne celler" grønne:
+            // Tjek om de har 'isPlayer' flaget eller er børn?
+            // Bacillus er isBacillus=true. 
+            // Standard Cell er isPlayer=false (normalt), men hvis de er "vores" gamle kroppe...
+            // Lad os sige alt der IKKE er Bacillus er "Vores" arter?
+            miniCtx.fillStyle = '#4CAF50'; // Egne (Grøn)
+        } else {
+            miniCtx.fillStyle = '#FF5252'; // Ukendt/Fjende (Rød) - Fallback
+        }
+
         miniCtx.fill();
     });
 
     // 4. Spilleren
     if (activeCell) {
-        miniCtx.fillStyle = '#69F0AE'; // Grøn
         const px = activeCell.x * scale;
         const py = activeCell.y * scale;
         miniCtx.beginPath();
         miniCtx.arc(px, py, 3, 0, Math.PI * 2);
+        miniCtx.fillStyle = '#4CAF50'; // Spiller (Grøn)
         miniCtx.fill();
+        miniCtx.strokeStyle = '#FFF';
+        miniCtx.lineWidth = 1;
+        miniCtx.stroke();
     }
 
     // 5. Kamera Viewport
@@ -424,7 +447,8 @@ function updateInspectorSidebar(cell) {
             list.appendChild(li);
         }
 
-        addGeneItem('Flagel', cell.genes.flagellum, 'Høj fart (2.0), Dyr drift');
+        addGeneItem('Monotrichous', cell.genes.flagellum, 'Høj fart (2.0), Dyr drift');
+        addGeneItem('High-Torque', cell.genes.highTorque, 'Ekstrem fart, Meget dyr');
         addGeneItem('Cilier', cell.genes.cilia, 'Bedre kontrol, Medium drift');
         addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
         addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
@@ -573,7 +597,8 @@ function gameLoop() {
         }
 
         otherCells.forEach(cell => checkCollisions(cell));
-        updateEnvironment(worldWidth, worldHeight);
+        // Opdater miljøet (mad spawning, partikler)
+        updateEnvironment(worldWidth, worldHeight, activeCell);
     }
 
     // 2. Tegning - Verden (Med Kamera Transform)

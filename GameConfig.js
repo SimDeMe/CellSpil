@@ -18,7 +18,8 @@ export const GameConfig = {
             flagellum: 3,
             megacytosis: 5,
             toxin: 1,
-            protease: 2
+            protease: 2,
+            highTorque: 5 // Dyr, men effektiv
         }
     },
     Bacillus: { // The Enemy

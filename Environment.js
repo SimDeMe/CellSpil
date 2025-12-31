@@ -149,7 +149,7 @@ function updateProteaseParticles(canvasWidth, canvasHeight) {
 }
 
 
-export function updateEnvironment(canvasWidth, canvasHeight) {
+export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     spawnTimer++;
     if (spawnTimer > GameConfig.World.foodSpawnRate && foodParticles.length < maxFood) {
         spawnFood(canvasWidth, canvasHeight);
@@ -158,6 +158,18 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
 
     updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
     updateProteaseParticles(canvasWidth, canvasHeight); // Protease Update
+
+    if (activeCell) {
+        resolveCollisions(activeCell, otherCells);
+    }
+    // Håndter Kollisioner
+    // Vi skal bruge main.js activeCell reference? Hmm Environment kender ikke activeCell direkte her i funktionen.
+    // Men updateEnvironment kaldes fra main.js hvor activeCell er.
+    // Vi må ændre signaturen på updateEnvironment eller håndtere det i main.js.
+    // Vent, Environment.js eksporterer funcions, men har ikke state om Playeren (udover hvad der sendes ind).
+    // Men Cell.js metoder tager 'otherCells' som argument.
+    // Bedste sted: Main Game Loop i main.js ELLER send player med ind i updateEnvironment.
+    // Let's check main.js call site.
 
     // Diffusion for næring
     foodParticles.forEach(food => {
@@ -280,8 +292,9 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
         const g = sister.genes;
 
         // Rækkefølge: Movement -> Toxin -> Protease
+        // Rækkefølge: Movement -> Toxin -> Protease
         if (!g.cilia && !g.flagellum) {
-            // Ingen bevægelse endnu. 50/50 Chance for Flagel eller Cilier
+            // Ingen bevægelse endnu. 50/50 Chance for Monotrichous eller Cilier
             possibleMutations.push('cilia', 'flagellum');
         } else if (!g.toxin) {
             // Har bevægelse, men ikke toxin. Næste er toxin.
@@ -289,9 +302,16 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
         } else if (!g.protease) {
             // Har toxin, men ikke protease. Næste er Protease.
             possibleMutations.push('protease');
-        } else if (!g.megacytosis) {
-            // Har alt det andet? Så måske megacytosis til sidst.
-            possibleMutations.push('megacytosis');
+        } else {
+            // Mutation Tree: Avancerede opgraderinger
+            if (g.flagellum && !g.highTorque) {
+                possibleMutations.push('highTorque');
+            }
+
+            if (!g.megacytosis) {
+                // Har alt det andet? Så måske megacytosis til sidst.
+                possibleMutations.push('megacytosis');
+            }
         }
 
         if (possibleMutations.length > 0) {
@@ -326,7 +346,7 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
     if (mutated && onMutationCallback && isPlayerChild) {
         // Send BÅDE mutationstype OG den nye søster-celle med
         console.log("Triggering mutation callback for player child");
-        onMutationCallback(mutated ? (sister.genes.toxin ? 'toxin' : sister.genes.megacytosis ? 'megacytosis' : sister.genes.flagellum ? 'flagellum' : sister.genes.cilia ? 'cilia' : 'unknown') : null, sister);
+        onMutationCallback(mutated ? (sister.genes.highTorque ? 'highTorque' : sister.genes.toxin ? 'toxin' : sister.genes.megacytosis ? 'megacytosis' : sister.genes.flagellum ? 'flagellum' : sister.genes.cilia ? 'cilia' : 'unknown') : null, sister);
 
         // Hov, min logik for mutationType string ovenfor var lidt doven.
         // Vi skal vide PRÆCIS hvilken mutation der skete.
