@@ -113,8 +113,8 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
 
     otherCells.forEach(cell => {
         // Her opdaterer vi NPC'erne (Bacillus og andre)
-        // Send foodParticles med så Bacillus kan finde mad
-        cell.update(null, null, canvasWidth, canvasHeight, foodParticles);
+        // Send foodParticles med så Bacillus kan finde mad, og otherCells for separation
+        cell.update(null, null, canvasWidth, canvasHeight, foodParticles, otherCells);
 
         // Division Logic
         if (cell.alive) {

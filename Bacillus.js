@@ -27,14 +27,103 @@ export class Bacillus extends Cell {
         this.atp = 150;
     }
 
-    update(mouse, inputKeys, worldWidth, worldHeight) {
+    update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells) {
         if (!this.alive) return;
 
         // Basal stofskifte (lavere end Cell)
         this.atp -= 0.01;
 
-        // Bevægelse: Simpel, langsom drift
-        this.moveAngle += (Math.random() - 0.5) * 0.2;
+        let targetFound = false;
+        let separationAngle = 0;
+        let separationWeight = 0;
+
+        // 1. SEPARATION: Undgå andre
+        if (otherCells) {
+            let neighborCount = 0;
+            let pushX = 0;
+            let pushY = 0;
+            const separationDist = 40; // Hvor tæt må de være?
+
+            for (const other of otherCells) {
+                if (other === this || !other.alive) continue;
+
+                const dx = this.x - other.x;
+                const dy = this.y - other.y;
+                const dst = Math.sqrt(dx * dx + dy * dy);
+
+                if (dst < separationDist) {
+                    // Skub væk! Jo tættere, jo stærkere
+                    const force = (separationDist - dst) / separationDist;
+                    pushX += (dx / dst) * force;
+                    pushY += (dy / dst) * force;
+                    neighborCount++;
+                }
+            }
+
+            if (neighborCount > 0) {
+                separationAngle = Math.atan2(pushY, pushX);
+                separationWeight = 2.0; // Meget høj prioritet at undgå kollision
+            }
+        }
+
+        // 2. FOOD SEEKING
+        if (foodParticles) {
+            let nearest = null;
+            let minDst = 300;
+
+            for (const food of foodParticles) {
+                const dx = food.x - this.x;
+                const dy = food.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < minDst) {
+                    minDst = dist;
+                    nearest = food;
+                }
+            }
+
+            if (nearest) {
+                targetFound = true;
+                const targetAngle = Math.atan2(nearest.y - this.y, nearest.x - this.x);
+
+                // Mix angles
+                let wantsToGo = targetAngle;
+
+                // Hvis vi er for tæt på andre, ignorer mad og flygt!
+                if (separationWeight > 0) {
+                    // Mix: Mest separation, lidt mad
+                    // En enkel måde er at lægge separation oveni
+                    // Eller bare bruge weighted average logic
+
+                    // Lad os sige: Hvis vi skubbes væk, så styrer vi væk.
+                    // Vi 'blender' separation angle ind i target angle
+
+                    // Simpel løsning: Drej mod separation
+                    wantsToGo = separationAngle;
+                }
+
+                // Drej mod målet (Smooth)
+                let diff = wantsToGo - this.moveAngle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+
+                this.moveAngle += diff * 0.1; // Lidt hurtigere drejning
+            }
+        }
+
+        // Hvis vi bare drifter, men er tæt på andre -> Separer!
+        if (!targetFound && separationWeight > 0) {
+            let diff = separationAngle - this.moveAngle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            this.moveAngle += diff * 0.1;
+        }
+
+        if (!targetFound && separationWeight === 0) {
+            // Bevægelse: Simpel, langsom drift
+            this.moveAngle += (Math.random() - 0.5) * 0.2;
+        }
+
         this.x += Math.cos(this.moveAngle) * this.speed;
         this.y += Math.sin(this.moveAngle) * this.speed;
         this.atp -= 0.005;
