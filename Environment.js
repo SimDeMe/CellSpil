@@ -129,45 +129,25 @@ function updateProteaseParticles(canvasWidth, canvasHeight) {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < cell.radius) {
-                // Ramt et lig!
-                if (!cell.corpseHp) cell.corpseHp = 100; // Init corpse HP
-                cell.corpseHp -= 5; // Proteaser er effektive
-
-                // Visuel effekt? (Celle bliver mindre/gennemsigtig?)
-                cell.radius *= 0.99;
-
-                if (cell.corpseHp <= 0) {
-                    // Opløs cellen til mad!
-                    // Spawn 5 Glucose + 2 Amino
-                    for (let k = 0; k < 5; k++) {
-                        const f = {
-                            x: cell.x + (Math.random() - 0.5) * 20,
-                            y: cell.y + (Math.random() - 0.5) * 20,
-                            type: 'glucose', radius: 3, color: '#FFEB3B',
-                            vx: (Math.random() - 0.5), vy: (Math.random() - 0.5)
-                        };
-                        foodParticles.push(f);
-                    }
-                    for (let k = 0; k < 2; k++) {
-                        const f = {
-                            x: cell.x + (Math.random() - 0.5) * 20,
-                            y: cell.y + (Math.random() - 0.5) * 20,
-                            type: 'amino', radius: 4, color: '#2196F3',
-                            vx: (Math.random() - 0.5), vy: (Math.random() - 0.5)
-                        };
-                        foodParticles.push(f);
-                    }
-
-                    console.log("Lig opløst!");
-                    otherCells.splice(j, 1);
+                // Ramt et lig eller en ikke-dekomponerende celle
+                if (cell.isDecomposing) {
+                    // Allerede i gang, fjern bare partiklen (hjælper måske?)
+                    proteaseParticles.splice(i, 1);
+                    continue;
                 }
 
-                proteaseParticles.splice(i, 1); // Partikel brugt
+                // Start nedbrydning!
+                cell.isDecomposing = true;
+                cell.decompositionTimer = 120; // 2 sekunder (60 fps)
+
+                // Partiklen "hæfter" sig (forsvinder visuelt ind i cellen)
+                proteaseParticles.splice(i, 1);
                 break;
             }
         }
     }
 }
+
 
 export function updateEnvironment(canvasWidth, canvasHeight) {
     spawnTimer++;
@@ -190,7 +170,63 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
         if (food.y > canvasHeight) food.y = canvasHeight;
     });
 
-    otherCells.forEach(cell => {
+    otherCells.forEach((cell, index) => {
+        // Håndter nedbrydning (Protease effekt)
+        if (cell.isDecomposing) {
+            cell.decompositionTimer--;
+
+            // Blink effekt håndteres i draw(), men vi kan ændre farve her
+            if (cell.decompositionTimer % 10 < 5) {
+                cell.color = '#E91E63'; // Protease farve
+            } else {
+                cell.color = '#444'; // Død farve
+            }
+
+            if (cell.decompositionTimer <= 0) {
+                // OPLØS NU!
+                console.log("Lig opløst efter timer!");
+
+                // Random 1-3 Amino
+                const aminoCount = Math.floor(Math.random() * 3) + 1;
+                for (let k = 0; k < aminoCount; k++) {
+                    foodParticles.push({
+                        x: cell.x + (Math.random() - 0.5) * 10,
+                        y: cell.y + (Math.random() - 0.5) * 10,
+                        type: 'amino', radius: 4, color: '#2196F3',
+                        vx: (Math.random() - 0.5), vy: (Math.random() - 0.5)
+                    });
+                }
+
+                // Random 1-3 Glucose
+                const glucoseCount = Math.floor(Math.random() * 3) + 1;
+                for (let k = 0; k < glucoseCount; k++) {
+                    foodParticles.push({
+                        x: cell.x + (Math.random() - 0.5) * 10,
+                        y: cell.y + (Math.random() - 0.5) * 10,
+                        type: 'glucose', radius: 3, color: '#FFEB3B',
+                        vx: (Math.random() - 0.5), vy: (Math.random() - 0.5)
+                    });
+                }
+
+                // Fjern cellen
+                // Note: Vi muterer arrayet mens vi itererer, men forEach er robust nok i JS arrays normalt, 
+                // men det er bedre at markere for sletning eller bruge filter.
+                // Hack: Sæt alive=false (hvis den ikke allerede er) og lad en cleanup process tage den?
+                // Eller bare splice forsigtigt.
+                // Da vi bruger index, kan vi splice, men vi skal passe på loopet.
+                // Bedste måde i dette setup: Set en flag 'removed' og filter bagefter?
+                // Eller simpler: Vi fjerner den bare her, og browserens JS engine håndterer det oftest ok,
+                // men index kan skride.
+                // Lad os bruge en 'markedForDeletion' strategi hvis vi vil være sikre,
+                // men her: otherCells.splice(index, 1) vil ødelægge iterationen for næste element.
+                // Løsning: Iterer baglæns!
+                // Men forEach itererer forlæns.
+                // Jeg ændrer loopet nedenfor til reverse for loop i næste step hvis nødvendigt.
+                // Men vent, for at undgå at omskrive hele loopet nu:
+                cell.shouldRemove = true;
+            }
+        }
+
         // Her opdaterer vi NPC'erne (Bacillus og andre)
         // Send foodParticles med så Bacillus kan finde mad, og otherCells for separation
         cell.update(null, null, canvasWidth, canvasHeight, foodParticles, otherCells);
@@ -218,6 +254,13 @@ export function updateEnvironment(canvasWidth, canvasHeight) {
             }
         }
     });
+
+    // Cleanup fjernede celler
+    for (let i = otherCells.length - 1; i >= 0; i--) {
+        if (otherCells[i].shouldRemove) {
+            otherCells.splice(i, 1);
+        }
+    }
 }
 
 export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false) {
