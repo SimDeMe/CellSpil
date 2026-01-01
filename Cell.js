@@ -59,6 +59,13 @@ export class Cell {
         this.angle = 0;
 
         this.onAction = null; // Callback for abilities
+
+        // Endocytose Animation State
+        this.engulfed = false;
+        this.engulfedBy = null;
+        this.shouldRemove = false;
+
+        this.size = 1; // Default size tier
     }
 
     // Ny metode til at genberegne krav baseret på gener
@@ -94,12 +101,38 @@ export class Cell {
     }
 
     update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells, viewHeight = 600) {
+        // Hvis engulfed, kør animation i stedet for normal update
+        if (this.engulfed) {
+            if (this.engulfedBy) {
+                // Flyt mod maven på rovdyret
+                const dx = this.engulfedBy.x - this.x;
+                const dy = this.engulfedBy.y - this.y;
+                this.x += dx * 0.1;
+                this.y += dy * 0.1;
+
+                // Skrump
+                this.radius *= 0.9;
+
+                // Fjern når den er lille nok
+                if (this.radius < 2) {
+                    this.shouldRemove = true;
+                }
+            } else {
+                this.shouldRemove = true; // Fallback hvis predator er væk
+            }
+            return;
+        }
+
+        if (!this.alive && this.radius > 5) {
+            // Optional: Decomposing visual logic here if needed, but keeping it simple for now
+        }
         if (!this.alive) return;
 
         const width = worldWidth;
         const height = worldHeight;
 
         this.age++; // Increment age
+        this.pulse += 0.1; // Animation pulse for flagellum
 
         // 3. Bevægelse
         // Base hastighed (alle kan bevæge sig lidt)

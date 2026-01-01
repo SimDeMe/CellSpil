@@ -333,6 +333,16 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
 
         // VIGTIGT: Opdater parametre efter mutationer/arv er sat
         sister.updateMaxGrowth();
+    } else {
+        // Opdater også hvis ingen mutation (bare arv) for at sætte size korrekt
+        sister.updateMaxGrowth();
+    }
+
+    // Tilføj til verden! (VIGTIGT: Ellers findes den ikke)
+    // Hvis det er player child og mutation callback kaldes, bliver den MÅSKE activeCell i stedet midlertidigt.
+    // Hvis den ER blevet spiller, må den IKKE være i otherCells (NPC listen).
+    if (!sister.isPlayer) {
+        otherCells.push(sister);
     }
 }
 
@@ -458,7 +468,8 @@ export function resolveCollisions(player, others) {
             const c1 = allCells[i];
             const c2 = allCells[j];
 
-            if (!c1.alive || !c2.alive) continue; // Ingen kollision med døde
+            if (!c1.alive && !c2.alive) continue; // Ignorer kun hvis BEGGE er døde
+            if (c1.engulfed || c2.engulfed) continue; // Ignorer hvis en af dem allerede bliver spist
 
             const dx = c2.x - c1.x;
             const dy = c2.y - c1.y;
@@ -472,23 +483,35 @@ export function resolveCollisions(player, others) {
                 let eaten = false;
 
                 // Tjek om c1 spiser c2
-                // Krav: Endocytose gen, c1 > c2 i size tier (Større spiser mindre), mindre radius (0.7x), alder > 100
-                if (c1.genes.endocytosis && c1.size > c2.size && c2.radius < c1.radius * 0.7 && c1.alive && c2.alive && c2.age > 100) {
-                    c2.kill();
+                // Krav: Endocytose gen, c1 > c2 i size tier, c2 er (Bacillus eller Død), Mindre radius, Ikke Player, (Age check kun hvis levende og ikke Bacillus? Let's simplificere: Spis alt valid som ikke er Player)
+                // Diet: Kun Bacillus eller Døde celler.
+                const validPreyC2 = (c2.isBacillus || !c2.alive);
+                if (c1.genes.endocytosis && c1.alive && validPreyC2 && c1.size > c2.size && c2.radius < c1.radius * 0.7 && !c2.isPlayer) {
+                    if (c2.alive) {
+                        // Kun alderstjek på levende bacillus for at undgå instant-spawn kill (valgfrit) -> Vi fjerner age check her da Bacillus er fjende
+                    }
+
+                    // Start engulfment animation i stedet for instant kill
+                    c2.engulfed = true;
+                    c2.engulfedBy = c1;
+
+                    // Giv ressourcer med det samme (kun én gang da vi ignorerer engulfed i loopet fremover)
                     c1.atp += 20;
                     c1.aminoAcids += 1;
                     c1.nucleotides += 1;
                     eaten = true;
-                    console.log("Endocytose: C1 spiste C2");
+                    console.log("Endocytose: C1 spiste C2 (Animation Started)");
                 }
                 // Tjek om c2 spiser c1
-                else if (c2.genes.endocytosis && c2.size > c1.size && c1.radius < c2.radius * 0.7 && c1.alive && c2.alive && c1.age > 100) {
-                    c1.kill();
+                else if (c2.genes.endocytosis && c2.alive && (c1.isBacillus || !c1.alive) && c2.size > c1.size && c1.radius < c2.radius * 0.7 && !c1.isPlayer) {
+                    c1.engulfed = true;
+                    c1.engulfedBy = c2;
+
                     c2.atp += 20;
                     c2.aminoAcids += 1;
                     c2.nucleotides += 1;
                     eaten = true;
-                    console.log("Endocytose: C2 spiste C1");
+                    console.log("Endocytose: C2 spiste C1 (Animation Started)");
                 }
 
                 if (!eaten) {

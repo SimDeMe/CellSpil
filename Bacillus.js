@@ -29,6 +29,28 @@ export class Bacillus extends Cell {
     }
 
     update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells) {
+        // Hvis engulfed, kør animation i stedet for normal update
+        if (this.engulfed) {
+            if (this.engulfedBy) {
+                // Flyt mod maven på rovdyret
+                const dx = this.engulfedBy.x - this.x;
+                const dy = this.engulfedBy.y - this.y;
+                this.x += dx * 0.1;
+                this.y += dy * 0.1;
+
+                // Skrump
+                this.radius *= 0.9;
+
+                // Fjern når den er lille nok
+                if (this.radius < 2) {
+                    this.alive = false; // Kill logic handles removal
+                }
+            } else {
+                this.alive = false;
+            }
+            return;
+        }
+
         if (!this.alive) return;
 
         // Basal stofskifte (lavere end Cell)

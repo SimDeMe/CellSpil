@@ -7,11 +7,11 @@ export const GameConfig = {
         invasionTime: 60000, // ms
     },
     Player: {
-        baseSpeed: 1.5,
+        baseSpeed: 2,
         maxAtp: 100,
         baseMaxAmino: 3,
         baseMaxNucleotides: 3, // [NEW] DNA byggesten
-        moveCost: 0.01,
+        moveCost: 0.001,
         mutationRate: 1.0,
         backMutationRate: 0.0,
         mutationCosts: {
