@@ -54,13 +54,20 @@
                 <span id="inspNucleoVal">0/0</span>
             </div>
 
-            <h3>Gener</h3>
-            <ul id="inspGeneList">
-                <!-- Populated by JS -->
-            </ul>
+            <!-- TABS -->
+            <div class="inspector-tabs">
+                <button class="tab-btn active" id="tabBtnTree">EVOSITION</button>
+                <button class="tab-btn" id="tabBtnMission">MISSION</button>
+            </div>
 
-            <div class="notice">
-                Tryk 'I' igen for at lukke
+            <!-- CONTENT: EVOLUTION TREE -->
+            <div id="tabContentTree" class="tab-content active">
+                <div id="inspTreeRoot"></div>
+            </div>
+
+            <!-- CONTENT: MISSION -->
+            <div id="tabContentMission" class="tab-content">
+                <div id="inspMissionRoot"></div>
             </div>
         </div>
     </div>

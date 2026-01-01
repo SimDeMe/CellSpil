@@ -160,32 +160,40 @@ function showMutationPopup(mutationType, newCell = null) {
 
     if (mutationType === 'flagellum') {
         title.innerText = "Ny Mutation: Monotrichous!";
-        desc.innerText = "En lang hale der giver kraftig fremdrift.";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.flagellum} Aminosyrer. Højt stofskifte.`;
-    } else if (mutationType === 'cilia') {
-        title.innerText = "Ny Mutation: Cilier!";
-        desc.innerText = "Små fimrehår der giver bedre kontrol.";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.cilia} Aminosyrer. Medium stofskifte.`;
+        desc.innerText = "Tier 1 (Movement). En lang hale der giver kraftig fremdrift.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.flagellum} Aminosyrer.`;
+    } else if (mutationType === 'pili') {
+        title.innerText = "Ny Mutation: Type IV Pili!";
+        desc.innerText = "Tier 1 (Movement). Gribekroge til twitch-bevægelse.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.pili} Aminosyrer.`;
     } else if (mutationType === 'highTorque') {
         title.innerText = "Ny Mutation: High-Torque Flagel!";
-        desc.innerText = "En super-tunet motor! Ekstrem fart.";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.highTorque} Aminosyrer. Ekstremt stofskifte!`;
+        desc.innerText = "Tier 3 (Upgrade). En super-tunet motor! Ekstrem fart.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.highTorque} Aminosyrer.`;
+    } else if (mutationType === 'highSpeedRetraction') {
+        title.innerText = "Ny Mutation: High-Speed Retraction!";
+        desc.innerText = "Tier 3 (Upgrade). Pili trækker dig meget hurtigere frem.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.highSpeedRetraction} Aminosyrer.`;
+    } else if (mutationType === 'multiplexPili') {
+        title.innerText = "Ny Mutation: Multiplex Pili!";
+        desc.innerText = "Tier 3 (Upgrade). Flere pili og længere rækkevidde!";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.multiplexPili} Aminosyrer.`;
     } else if (mutationType === 'megacytosis') {
         title.innerText = "Ny Mutation: Megacytose!";
-        desc.innerText = "Du vokser til dobbelt størrelse! Mere HP, men langsommere.";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.megacytosis} Aminosyrer. Dobbelte omkostninger.`;
+        desc.innerText = "Tier 3 (Size). Du vokser til dobbelt størrelse! Mere HP.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.megacytosis} Aminosyrer.`;
     } else if (mutationType === 'toxin') {
         title.innerText = "Ny Mutation: Toxin!";
-        desc.innerText = "Tryk 'E' for at udskille gift der dræber konkurrenter.";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.toxin} Aminosyrer + Aktivt forbrug.`;
+        desc.innerText = "Tier 2 (Ability). Tryk 'E' for at udskille gift.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.toxin} Aminosyrer.`;
     } else if (mutationType === 'protease') {
         title.innerText = "Ny Mutation: Proteaser!";
-        desc.innerText = "Tryk 'R' for at opløse døde celler til mad.";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.protease} Aminosyrer + Aktivt forbrug.`;
+        desc.innerText = "Tier 2 (Ability). Tryk 'R' for at opløse lig til mad.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.protease} Aminosyrer.`;
     } else if (mutationType === 'endocytosis') {
         title.innerText = "Ny Mutation: Endocytose!";
-        desc.innerText = "Du kan nu spise mindre celler ved at svømme ind i dem!";
-        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.endocytosis} Aminosyrer. Kræver Megacytose.`;
+        desc.innerText = "Tier 4 (Apex). Du kan nu spise mindre celler!";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.endocytosis} Aminosyrer.`;
     }
 
     // AUTO-SWITCH: Hvis vi har fået en ny celle, skift til den!
@@ -282,6 +290,9 @@ function init() {
 
     // Register callback for mutationer
     setMutationCallback(showMutationPopup);
+
+    // Setup UI Tabs (Inspector)
+    setupInspectorTabs();
 }
 
 function handleCellSwitch() {
@@ -330,23 +341,37 @@ function handleCellSwitch() {
 }
 
 function handleDivision() {
+    // 1. Check for Trigger (Key Press + Resources + Not already dividing)
     if (activeCell && keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
-        // Gem reference til moderen, da activeCell kan ændre sig under spawnSisterCell (ved mutation swap)
-        const mother = activeCell;
+        if (!activeCell.isDividing) {
+            activeCell.startDivision();
+            // Optional: Play a sound? "glop"
+        }
+    }
 
-        // Spawn søster (true = spillerens barn)
-        spawnSisterCell(mother.x, mother.y, mother.genes, true);
+    // 2. Process Division State (Animation)
+    if (activeCell && activeCell.isDividing) {
+        // Check if animation is complete
+        if (activeCell.divisionTimer >= activeCell.divisionDuration) {
+            // --- SPAWN LOGIC ---
+            const mother = activeCell;
 
-        // Reset moderen (selvom vi måske ikke styrer hende mere, skal hun nulstilles i verdenen)
-        mother.aminoAcids = 0;
-        mother.radius = mother.minRadius;
-        // Flyt kun moderen lidt væk, så de ikke hænger sammen
-        mother.x += 30;
+            // Spawn søster (true = spillerens barn)
+            spawnSisterCell(mother.x, mother.y, mother.genes, true);
 
-        generation++;
+            // Reset moderen
+            mother.aminoAcids = 0;
+            mother.radius = mother.minRadius;
+            // Shift mother slightly left/right against child?
+            // Animation separates them, so logical shift is fine.
+            mother.x -= 10;
 
-        // Forhindr "maskingevær" deling ved at fjerne trykket
-        keys.d = false;
+            generation++;
+
+            // Nulstil division state
+            mother.finalizeDivision();
+            keys.d = false; // Reset key to prevent double spawn
+        }
     }
 }
 
@@ -424,9 +449,42 @@ function drawMinimap() {
 }
 
 // --- NY SIDEBAR FUNKTION ---
+// --- INSPECTOR TABS SETUP ---
+function setupInspectorTabs() {
+    const btnTree = document.getElementById('tabBtnTree');
+    const btnMission = document.getElementById('tabBtnMission');
+    const contentTree = document.getElementById('tabContentTree');
+    const contentMission = document.getElementById('tabContentMission');
+
+    if (!btnTree || !btnMission) return;
+
+    btnTree.onclick = () => {
+        btnTree.classList.add('active');
+        btnMission.classList.remove('active');
+        contentTree.classList.add('active');
+        contentMission.classList.remove('active');
+    };
+
+    btnMission.onclick = () => {
+        btnMission.classList.add('active');
+        btnTree.classList.remove('active');
+        contentMission.classList.add('active');
+        contentTree.classList.remove('active');
+        // Force refresh of mission content? It updates every frame anyway.
+    };
+}
+
+// --- NY SIDEBAR FUNKTION (TABBED) ---
 function updateInspectorSidebar(cell) {
-    // Opdater DOM elementer
+    // Opdater DOM elementer (Stats)
     document.getElementById('inspGen').innerText = generation;
+
+    // Population Counters
+    const playerCount = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
+    const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
+    // (Vi har fjernet pop elementerne fra screen overlay, men hvis de fandtes: check if exist)
+    // Hvis vi vil vise dem i sidebaren, skal vi tilføje dem i HTML. 
+    // HTML koden fik dem ikke med i sidebar-content i denne omgang, men lad os fokusere på Tabs.
 
     if (cell) {
         // ATP
@@ -444,42 +502,121 @@ function updateInspectorSidebar(cell) {
         document.getElementById('inspNucleoBar').style.width = nucleoPct + '%';
         document.getElementById('inspNucleoVal').innerText = `${cell.nucleotides} / ${cell.maxNucleotides}`;
 
-        // Gener Liste
-        const list = document.getElementById('inspGeneList');
-        list.innerHTML = ''; // Start forfra
+        // === TAB 1: EVOLUTION TREE ===
+        const treeRoot = document.getElementById('inspTreeRoot');
+        if (treeRoot && document.getElementById('tabContentTree').classList.contains('active')) {
+            treeRoot.innerHTML = '';
+            const g = cell.genes;
 
-        // Helper function
-        function addGeneItem(name, active, desc) {
-            const li = document.createElement('li');
-            li.className = active ? 'active' : '';
-            li.innerHTML = `<strong>${name}</strong><br><span style="color:#aaa; font-size:12px;">${active ? desc : 'Ikke aktiv'}</span>`;
-            list.appendChild(li);
+            function createNode(title, unlocked, lockedText = "Låst") {
+                const div = document.createElement('div');
+                div.className = `tree-node ${unlocked ? 'acquired' : 'locked'}`;
+                div.innerHTML = `
+                    <div class="tree-item">
+                        <span>${unlocked ? '✅' : '🔒'} ${title}</span>
+                    </div>
+                 `;
+                return div;
+            }
+
+            function createTier(name) {
+                const div = document.createElement('div');
+                div.className = 'tree-tier-title';
+                div.innerText = name;
+                return div;
+            }
+
+            // TIER 1
+            const t1 = document.createElement('div');
+            t1.appendChild(createTier('TIER 1 (Movement)'));
+            if (g.pili) t1.appendChild(createNode('Type IV Pili', true));
+            else if (g.flagellum) t1.appendChild(createNode('Flagellum', true));
+            else {
+                t1.appendChild(createNode('Ingen Mutation', false, "Vælg Pili eller Flagel (Auto)"));
+            }
+            treeRoot.appendChild(t1);
+
+            // TIER 2
+            const t2 = document.createElement('div');
+            t2.appendChild(createTier('TIER 2 (Abilities)'));
+            // Viser status for begge
+            t2.appendChild(createNode('Toxin (E)', g.toxin));
+            t2.appendChild(createNode('Protease (R)', g.protease));
+            treeRoot.appendChild(t2);
+
+            // TIER 3
+            const t3 = document.createElement('div');
+            t3.appendChild(createTier('TIER 3 (Upgrades)'));
+            if (g.pili) {
+                t3.appendChild(createNode('High-Speed Retraction', g.highSpeedRetraction));
+                t3.appendChild(createNode('Multiplex Pili', g.multiplexPili));
+            }
+            if (g.flagellum) {
+                t3.appendChild(createNode('High-Torque', g.highTorque));
+            }
+            t3.appendChild(createNode('Megacytose', g.megacytosis));
+            treeRoot.appendChild(t3);
+
+            // TIER 4
+            const t4 = document.createElement('div');
+            t4.appendChild(createTier('TIER 4 (Apex)'));
+            t4.appendChild(createNode('Endocytosis', g.endocytosis));
+            treeRoot.appendChild(t4);
         }
 
-        addGeneItem('Flagel (Hale)', cell.genes.flagellum, 'Kraftig fremdrift');
-        addGeneItem('Type IV Pili', cell.genes.pili, 'Bedre kontrol, Medium drift');
-        addGeneItem('High-Speed Retraction', cell.genes.highSpeedRetraction, 'Hurtigere Pili');
-        addGeneItem('Multiplex Pili', cell.genes.multiplexPili, 'Maksimal Pili Fart');
-        addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
-        addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
-        addGeneItem('Protease', cell.genes.protease, 'Opløs lig (Tryk R)');
-        addGeneItem('Endocytosis', cell.genes.endocytosis, 'Spis små celler (Passiv)');
+        // === TAB 2: MISSION ===
+        const missionRoot = document.getElementById('inspMissionRoot');
+        if (missionRoot && document.getElementById('tabContentMission').classList.contains('active')) {
+            missionRoot.innerHTML = '';
+            const g = cell.genes;
+
+            function addMission(text, done) {
+                const div = document.createElement('div');
+                div.className = `mission-item ${done ? 'done' : ''}`;
+                div.innerText = text;
+                missionRoot.appendChild(div);
+            }
+
+            // Logic to determine Next Steps
+            const hasMove = g.pili || g.flagellum;
+            const hasT2 = g.toxin && g.protease;
+            const hasSize = g.megacytosis;
+            const hasEndo = g.endocytosis;
+
+            addMission("1. Udvikl Bevægelse (Pili/Flagel)", hasMove);
+
+            if (hasMove) {
+                if (!hasT2) {
+                    addMission("2. Udvikl Toxin (Angreb)", g.toxin);
+                    addMission("3. Udvikl Protease (Spisning)", g.protease);
+                    addMission("   (Du skal have BEGGE for at gå videre)", false);
+                } else {
+                    addMission("2. TIER 2 Fuldendt", true);
+
+                    if (!hasSize) {
+                        addMission("4. Voks dig stor (Megacytose)", false);
+                        addMission("   (Du kan også opgradere din fart nu)", true);
+                    } else {
+                        addMission("4. Voks dig stor", true);
+
+                        if (!hasEndo) {
+                            addMission("5. BLIV APEX PREDATOR (Endocytose)", false);
+                        } else {
+                            addMission("5. APEX PREDATOR OPNÅET!", true);
+                            addMission("   Spis alt. Overtag verden.", false);
+                        }
+                    }
+                }
+            }
+        }
+
     } else {
-        // Hvis ingen celle er aktiv (Observe Mode)
+        // Observe Mode
         document.getElementById('inspAtpVal').innerText = "-";
-        document.getElementById('inspAminoVal').innerText = "-";
-        document.getElementById('inspNucleoVal').innerText = "-"; // Reset values
-        document.getElementById('inspGeneList').innerHTML = "<li><em>Observer Mode</em></li>";
+        // ... (clear tabs)
+        const treeRoot = document.getElementById('inspTreeRoot');
+        if (treeRoot) treeRoot.innerHTML = "<div style='padding:10px; color:#888'>Observe Mode<br>Klik på en celle for at overtage styringen.</div>";
     }
-
-    // Population Counters (Now in left box)
-    const playerCount = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
-    const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
-
-    const elPlayer = document.getElementById('popPlayer');
-    const elBacillus = document.getElementById('popBacillus');
-    if (elPlayer) elPlayer.innerText = playerCount;
-    if (elBacillus) elBacillus.innerText = bacillusCount;
 }
 
 // Opdater UI (Kun de elementer der ikke er i sidebar - dvs. knapper/overlays hvis nødvendigt)

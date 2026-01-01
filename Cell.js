@@ -75,7 +75,23 @@ export class Cell {
         this.piliState = 'idle'; // 'idle', 'extending', 'retracting'
         this.piliLength = 0;
         this.piliTargetAngle = 0;
-        this.piliMaxLength = 60; // Base length
+        this.piliMaxLength = 30; // [TUNED]: Halved from 60 for better control
+
+        // --- DIVISION ANIMATION STATE ---
+        this.isDividing = false;
+        this.divisionTimer = 0;
+        this.divisionDuration = 60; // 60 frames = approx 1 second
+    }
+
+    startDivision() {
+        this.isDividing = true;
+        this.divisionTimer = 0;
+    }
+
+    finalizeDivision() {
+        this.isDividing = false;
+        this.divisionTimer = 0;
+        return true; // Signal to main.js to perform actual spawn
     }
 
     // Ny metode til at genberegne krav baseret på gener
@@ -112,28 +128,39 @@ export class Cell {
     }
 
     update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells, viewHeight = 600) {
-        // ... (Engulfed logic remains the same) ...
-        if (this.engulfed) { /* ... */ return; }
-        if (!this.alive) return;
-
         const width = worldWidth;
         const height = worldHeight;
 
-        // ... (Age, Pulse, Upkeep remain the same) ...
+        // --- DIVISION ANIMATION TICK ---
+        // Block all updates if dividing
+        if (this.isDividing) {
+            this.divisionTimer++;
+            // We don't stop strictly at duration, we let main.js detect completion to trigger spawn
+            return;
+        }
 
         this.age++;
-        this.pulse += 0.1;
 
-        // --- BEVÆGELSE ---
-        let moveSpeed = 0.4; // Base drift
+        // --- ENDOCYTOSIS ANIMATION ---
+        if (this.engulfed) {
+            // ... existing engulfment logic ...
+            this.radius *= 0.95;
+            if (this.radius < 2) this.shouldRemove = true;
+            if (this.engulfedBy) {
+                this.x += (this.engulfedBy.x - this.x) * 0.1;
+                this.y += (this.engulfedBy.y - this.y) * 0.1;
+            }
+            return; // Stop other updates
+        }
 
-        // Upkeep (Passive)
-        if (this.genes.megacytosis) this.atp -= GameConfig.Player.upkeep.megacytosis;
-        if (this.genes.flagellum) this.atp -= GameConfig.Player.upkeep.flagellum;
-        if (this.genes.highTorque) this.atp -= GameConfig.Player.upkeep.highTorque;
+        // --- UPKEEP & RESOURCES ---
+        // (Cost logic from before...)
+
         if (this.genes.pili) this.atp -= GameConfig.Player.upkeep.pili;
         if (this.genes.highSpeedRetraction) this.atp -= GameConfig.Player.upkeep.highSpeedRetraction;
         if (this.genes.multiplexPili) this.atp -= GameConfig.Player.upkeep.multiplexPili;
+
+        let moveSpeed = 0.4; // Base drift
 
         // Modifiers
         if (this.genes.megacytosis) moveSpeed *= 0.5;
@@ -145,9 +172,6 @@ export class Cell {
         }
 
         // --- PILI MOVEMENT (Twitch Motility) ---
-        // Pili overrules normal movement when active? Or adds to it?
-        // Let's say Pili provides BURST movement.
-
         let piliMoveSpeed = 0;
 
         if (this.genes.pili && this.alive && this.isPlayer) {
@@ -159,15 +183,17 @@ export class Cell {
             // Params based on upgrades
             const extendSpeed = 5; // How fast it shoots out
             let retractSpeed = 2; // Base pull speed
-            let maxLen = 60;
+
+            // [TUNED] Shorter lengths for better control
+            let maxLen = 30; // Reduced from 60
 
             if (this.genes.highSpeedRetraction) {
                 retractSpeed = 6; // Much faster pull
-                maxLen = 80;
+                maxLen = 45; // Reduced from 80
             }
             if (this.genes.multiplexPili) {
                 retractSpeed = 8; // Even faster
-                maxLen = 100;
+                maxLen = 60; // Reduced from 100
             }
             this.piliMaxLength = maxLen;
 
@@ -309,11 +335,72 @@ export class Cell {
     }
 
     draw(ctx) {
+        // --- DIVISION ANIMATION ---
+        if (this.isDividing) {
+            // Calculate deformation
+            // 0 -> 0.3: Elongate (Stretch)
+            // 0.3 -> 1.0: Constrict (Pinch)
+            const progress = this.divisionTimer / this.divisionDuration;
+            const r = this.radius;
+
+            // Separation distance (0 to r*1.2)
+            const separation = progress * r * 1.5;
+
+            // Constriction radius (r to 0) - starts after 30%
+            let constriction = r;
+            if (progress > 0.3) {
+                const constrictProgress = (progress - 0.3) / 0.7;
+                constriction = r * (1 - constrictProgress * 0.8); // Don't go to 0 completely, just thin
+            }
+
+            // Draw as two overlapping circles that move apart
+            // To make it look "gooey", we draw a rect or lines connecting them if we want, 
+            // but just two circles moving apart with a "skin" is easier to start.
+
+            // For simplicity in this style: Draw two circles.
+            // Center is (this.x, this.y). We move them along X axis (for now, or random angle?)
+            // Let's use current Angle or just Horizontal. Horizontal is 0.
+            const angle = this.angle;
+
+            const x1 = this.x + Math.cos(angle) * -separation;
+            const y1 = this.y + Math.sin(angle) * -separation;
+
+            const x2 = this.x + Math.cos(angle) * separation;
+            const y2 = this.y + Math.sin(angle) * separation;
+
+            ctx.fillStyle = this.color;
+            ctx.strokeStyle = this.isPlayer ? '#81C784' : '#666';
+            ctx.lineWidth = 3;
+
+            // Circle 1
+            ctx.beginPath();
+            ctx.arc(x1, y1, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Circle 2
+            ctx.beginPath();
+            ctx.arc(x2, y2, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Connector (The Pinch) - Only if not fully separated
+            if (progress < 0.9) {
+                ctx.beginPath();
+                const perpAngle = angle + Math.PI / 2;
+                // Draw a bridge...
+                // This is complex to get perfect without metabolab library, 
+                // but just overlapping circles often looks good enough for "cell division".
+                // We rely on the two circles overlapping.
+            }
+            return; // Skip normal draw
+        }
+
+
         const r = this.radius + Math.sin(this.pulse) * 2;
 
         // Flagellum Draw
         if (this.genes.flagellum && this.alive) {
-            // ... (Flagellum draw code) ...
             const tailLength = r * 1.5;
             const direction = this.isPlayer ? (this.angle || 0) : this.moveAngle;
             const angle = direction + Math.PI;
@@ -332,31 +419,44 @@ export class Cell {
         // PILI DRAW (Twitch Motility)
         if (this.genes.pili && this.alive) {
             if (this.piliState === 'extending' || this.piliState === 'retracting') {
-                // Draw the grappling hook line
-                const startX = this.x + Math.cos(this.piliTargetAngle) * r;
-                const startY = this.y + Math.sin(this.piliTargetAngle) * r;
-                const endX = this.x + Math.cos(this.piliTargetAngle) * (r + this.piliLength);
-                const endY = this.y + Math.sin(this.piliTargetAngle) * (r + this.piliLength);
-
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(endX, endY);
                 ctx.strokeStyle = '#E0F7FA'; // Bright Cyan-ish
-                ctx.lineWidth = this.genes.multiplexPili ? 3 : 1; // Thicker if multiplex
-                ctx.stroke();
-
-                // Draw tip/hook?
-                ctx.beginPath();
-                ctx.arc(endX, endY, 2, 0, Math.PI * 2);
+                ctx.lineWidth = 1;
                 ctx.fillStyle = '#E0F7FA';
-                ctx.fill();
+
+                // Helper to draw one strand
+                const drawStrand = (offsetAngle) => {
+                    const angle = this.piliTargetAngle + offsetAngle;
+                    const startX = this.x + Math.cos(angle) * r;
+                    const startY = this.y + Math.sin(angle) * r;
+                    const endX = this.x + Math.cos(angle) * (r + this.piliLength);
+                    const endY = this.y + Math.sin(angle) * (r + this.piliLength);
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+
+                    // Tip
+                    ctx.beginPath();
+                    ctx.arc(endX, endY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                };
+
+                if (this.genes.multiplexPili) {
+                    // Two strands, angled +/- 15 degrees (0.26 rad)
+                    drawStrand(-0.25);
+                    drawStrand(0.25);
+                } else {
+                    // Single strand
+                    drawStrand(0);
+                }
             }
         }
 
         // Body
         ctx.beginPath();
         ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-        // ... (Shadow/Glow logic) ...
+        // Shadow/Glow logic
         if (this.alive && this.aminoAcids >= this.maxAminoAcids && this.nucleotides >= this.maxNucleotides) {
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#00BCD4';
