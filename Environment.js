@@ -383,11 +383,17 @@ function spawnFood(width, height) {
         vx: 0,
         vy: 0
     };
-    if (typeRandom > 0.8) {
+
+    if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
+        particle.type = 'nucleotide';
+        particle.color = '#F44336'; // Red
+        particle.radius = 4;
+    } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
         particle.type = 'amino';
-        particle.color = '#2196F3';
+        particle.color = '#2196F3'; // Blue
         particle.radius = 4;
     }
+
     foodParticles.push(particle);
 }
 

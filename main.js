@@ -161,27 +161,31 @@ function showMutationPopup(mutationType, newCell = null) {
     if (mutationType === 'flagellum') {
         title.innerText = "Ny Mutation: Monotrichous!";
         desc.innerText = "En lang hale der giver kraftig fremdrift.";
-        cost.innerText = "PRIS: +3 Aminosyrer, 2x ATP forbrug";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.flagellum} Aminosyrer. Højt stofskifte.`;
     } else if (mutationType === 'cilia') {
         title.innerText = "Ny Mutation: Cilier!";
         desc.innerText = "Små fimrehår der giver bedre kontrol.";
-        cost.innerText = "PRIS: +2 Aminosyrer, 1.5x ATP forbrug";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.cilia} Aminosyrer. Medium stofskifte.`;
     } else if (mutationType === 'highTorque') {
         title.innerText = "Ny Mutation: High-Torque Flagel!";
         desc.innerText = "En super-tunet motor! Ekstrem fart.";
-        cost.innerText = "PRIS: +5 Aminosyrer, 3x ATP forbrug";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.highTorque} Aminosyrer. Ekstremt stofskifte!`;
     } else if (mutationType === 'megacytosis') {
         title.innerText = "Ny Mutation: Megacytose!";
         desc.innerText = "Du vokser til dobbelt størrelse! Mere HP, men langsommere.";
-        cost.innerText = "PRIS: +5 Aminosyrer, 2x ATP (Stofskifte & Bevægelse), ½ Fart";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.megacytosis} Aminosyrer. Dobbelte omkostninger.`;
     } else if (mutationType === 'toxin') {
         title.innerText = "Ny Mutation: Toxin!";
         desc.innerText = "Tryk 'E' for at udskille gift der dræber konkurrenter.";
-        cost.innerText = "PRIS: +1 Aminosyrer, 15 ATP pr. skud";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.toxin} Aminosyrer + Aktivt forbrug.`;
     } else if (mutationType === 'protease') {
         title.innerText = "Ny Mutation: Proteaser!";
         desc.innerText = "Tryk 'R' for at opløse døde celler til mad.";
-        cost.innerText = "PRIS: +2 Aminosyrer, 10 ATP pr. skud";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.protease} Aminosyrer + Aktivt forbrug.`;
+    } else if (mutationType === 'endocytosis') {
+        title.innerText = "Ny Mutation: Endocytose!";
+        desc.innerText = "Du kan nu spise mindre celler ved at svømme ind i dem!";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.endocytosis} Aminosyrer. Kræver Megacytose.`;
     }
 
     // AUTO-SWITCH: Hvis vi har fået en ny celle, skift til den!

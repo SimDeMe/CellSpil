@@ -18,7 +18,9 @@ export class Cell {
 
         // Vækst Modifiers (Nemt at redigere)
         this.baseMaxAmino = GameConfig.Player.baseMaxAmino;
-        this.aminoCostCilia = GameConfig.Player.mutationCosts.cilia;
+        this.aminoCostPili = GameConfig.Player.mutationCosts.pili;
+        this.aminoCostHighSpeed = GameConfig.Player.mutationCosts.highSpeedRetraction;
+        this.aminoCostMultiplex = GameConfig.Player.mutationCosts.multiplexPili;
         this.aminoCostFlagellum = GameConfig.Player.mutationCosts.flagellum;
         this.aminoCostMegacytosis = GameConfig.Player.mutationCosts.megacytosis;
         this.aminoCostToxin = GameConfig.Player.mutationCosts.toxin;
@@ -43,7 +45,9 @@ export class Cell {
         // Gener
         this.genes = {
             flagellum: false,
-            cilia: false,
+            pili: false, // Replaces cilia
+            highSpeedRetraction: false,
+            multiplexPili: false,
             megacytosis: false,
             toxin: false,
             protease: false,
@@ -71,7 +75,11 @@ export class Cell {
     // Ny metode til at genberegne krav baseret på gener
     updateMaxGrowth() {
         let cost = this.baseMaxAmino;
-        if (this.genes.cilia) cost += this.aminoCostCilia;
+        if (this.genes.pili) cost += this.aminoCostPili;
+        if (this.genes.highSpeedRetraction) cost += this.aminoCostHighSpeed;
+        if (this.genes.multiplexPili) cost += this.aminoCostMultiplex;
+        if (this.genes.cilia) { /* Legacy check cleanup? No, just replace */ }
+        // ... replaced cilia line
         if (this.genes.flagellum) cost += this.aminoCostFlagellum;
         if (this.genes.megacytosis) cost += this.aminoCostMegacytosis;
         if (this.genes.toxin) cost += this.aminoCostToxin;
@@ -141,8 +149,10 @@ export class Cell {
         // Gen-specifikke omkostninger (Passive)
         if (this.genes.megacytosis) this.atp -= GameConfig.Player.upkeep.megacytosis;
         if (this.genes.flagellum) this.atp -= GameConfig.Player.upkeep.flagellum;
-        if (this.genes.highTorque) this.atp -= GameConfig.Player.upkeep.highTorque; // Ekstra dyr i drift
-        if (this.genes.cilia) this.atp -= GameConfig.Player.upkeep.cilia;
+        if (this.genes.highTorque) this.atp -= GameConfig.Player.upkeep.highTorque;
+        if (this.genes.pili) this.atp -= GameConfig.Player.upkeep.pili;
+        if (this.genes.highSpeedRetraction) this.atp -= GameConfig.Player.upkeep.highSpeedRetraction;
+        if (this.genes.multiplexPili) this.atp -= GameConfig.Player.upkeep.multiplexPili;
 
         // Megacytose: Halv fart
         if (this.genes.megacytosis) moveSpeed *= 0.5;
@@ -153,8 +163,10 @@ export class Cell {
             if (this.genes.highTorque) {
                 moveSpeed += 2.0; // Yderligere kæmpe bonus (Total +4.0)
             }
-        } else if (this.genes.cilia) {
-            moveSpeed += 1.0; // Lille bonus
+        } else if (this.genes.pili) {
+            moveSpeed += 1.0; // Base Pili
+            if (this.genes.highSpeedRetraction) moveSpeed += 1.0; // Upgrade 1
+            if (this.genes.multiplexPili) moveSpeed += 1.5; // Upgrade 2
         }
 
         if (this.isPlayer && inputKeys) {
@@ -223,7 +235,11 @@ export class Cell {
                     moveCost = GameConfig.Player.moveCostOverride.flagellum;
                     if (this.genes.highTorque) moveCost = GameConfig.Player.moveCostOverride.highTorque; // Meget dyrt
                 }
-                else if (this.genes.cilia) moveCost = GameConfig.Player.moveCostOverride.cilia;
+                else if (this.genes.pili) {
+                    moveCost = GameConfig.Player.moveCostOverride.pili;
+                    if (this.genes.highSpeedRetraction) moveCost = GameConfig.Player.moveCostOverride.highSpeedRetraction;
+                    if (this.genes.multiplexPili) moveCost = GameConfig.Player.moveCostOverride.multiplexPili;
+                }
 
                 // Hvis vi bevæger os langsomt (speedFactor < 1), er det billigere?
                 // Ja, lad os belønne præcision
@@ -308,15 +324,20 @@ export class Cell {
             ctx.stroke();
         }
 
-        // Tegn Cilier (Hår) hvis den findes
-        if (this.genes.cilia && this.alive) {
-            const numCilia = 12;
-            for (let i = 0; i < numCilia; i++) {
-                const angle = (Math.PI * 2 / numCilia) * i + this.pulse * 0.5;
+        // Tegn Pili (former Cilia)
+        if (this.genes.pili && this.alive) {
+            const numPili = 12;
+            for (let i = 0; i < numPili; i++) {
+                const angle = (Math.PI * 2 / numPili) * i + this.pulse * 0.5;
                 const cX = this.x + Math.cos(angle) * r;
                 const cY = this.y + Math.sin(angle) * r;
-                const cEndX = this.x + Math.cos(angle) * (r + 5);
-                const cEndY = this.y + Math.sin(angle) * (r + 5);
+                // Longer pili if upgraded?
+                let length = 5;
+                if (this.genes.highSpeedRetraction) length = 8;
+                if (this.genes.multiplexPili) length = 12;
+
+                const cEndX = this.x + Math.cos(angle) * (r + length);
+                const cEndY = this.y + Math.sin(angle) * (r + length);
 
                 ctx.beginPath();
                 ctx.moveTo(cX, cY);

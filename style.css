@@ -137,13 +137,20 @@ button:hover {
 
 .bar {
     height: 100%;
-    background: #FFC107;
+    background: #FFEB3B;
+    /* Glucose Yellow */
     width: 0%;
     transition: width 0.2s;
 }
 
 .bar.amino {
-    background: #00E676;
+    background: #2196F3;
+    /* Amino Blue */
+}
+
+.bar.nucleo {
+    background: #F44336;
+    /* Nucleotide Red */
 }
 
 button.active-observe {
