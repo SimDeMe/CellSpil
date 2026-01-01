@@ -18,7 +18,7 @@ export class Bacillus extends Cell {
         // Ingen gener
         this.genes = {
             flagellum: false,
-            cilia: false,
+            pili: false, // Ingen Pili (før cilia)
             megacytosis: false,
             toxin: false
         };

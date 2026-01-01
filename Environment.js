@@ -292,27 +292,36 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
         const g = sister.genes;
 
         // Rækkefølge: Movement -> Toxin -> Protease
-        // Rækkefølge: Movement -> Toxin -> Protease
-        if (!g.cilia && !g.flagellum) {
-            // Ingen bevægelse endnu. 50/50 Chance for Monotrichous eller Cilier
-            possibleMutations.push('cilia', 'flagellum');
-        } else if (!g.toxin) {
-            // Har bevægelse, men ikke toxin. Næste er toxin.
-            possibleMutations.push('toxin');
-        } else if (!g.protease) {
-            // Har toxin, men ikke protease. Næste er Protease.
-            possibleMutations.push('protease');
-        } else {
-            // Mutation Tree: Avancerede opgraderinger
-            if (g.flagellum && !g.highTorque) {
-                possibleMutations.push('highTorque');
+
+        // TIER 1: MOVEMENT (Pili OR Flagellum) - Exclusive Access
+        if (!g.pili && !g.flagellum) {
+            possibleMutations.push('pili', 'flagellum');
+        }
+        else if (!g.toxin || !g.protease) {
+            // TIER 2: Toxin AND Protease - Exclusive Access
+            // Spilleren skal udvikle disse EVNER før de kan opgradere dem
+            if (!g.toxin) possibleMutations.push('toxin');
+            if (!g.protease) possibleMutations.push('protease');
+        }
+        else {
+            // TIER 3: Movement Upgrades & Size Upgrades
+
+            // Pili Upgrades
+            if (g.pili) {
+                if (!g.highSpeedRetraction) possibleMutations.push('highSpeedRetraction');
+                if (!g.multiplexPili) possibleMutations.push('multiplexPili');
             }
 
-            if (!g.megacytosis) {
-                // Har alt det andet? Så måske megacytosis til sidst.
-                possibleMutations.push('megacytosis');
-            } else if (!g.endocytosis) {
-                // Dependency: Megacytosis -> Endocytosis
+            // Flagellum upgrades
+            if (g.flagellum) {
+                if (!g.highTorque) possibleMutations.push('highTorque');
+            }
+
+            // Size Upgrade
+            if (!g.megacytosis) possibleMutations.push('megacytosis');
+
+            // TIER 4: Endocytosis (Locked behind Megacytosis)
+            if (g.megacytosis && !g.endocytosis) {
                 possibleMutations.push('endocytosis');
             }
         }

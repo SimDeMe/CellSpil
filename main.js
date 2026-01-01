@@ -456,9 +456,10 @@ function updateInspectorSidebar(cell) {
             list.appendChild(li);
         }
 
-        addGeneItem('Monotrichous', cell.genes.flagellum, 'Høj fart (2.0), Dyr drift');
-        addGeneItem('High-Torque', cell.genes.highTorque, 'Ekstrem fart, Meget dyr');
-        addGeneItem('Cilier', cell.genes.cilia, 'Bedre kontrol, Medium drift');
+        addGeneItem('Flagel (Hale)', cell.genes.flagellum, 'Kraftig fremdrift');
+        addGeneItem('Type IV Pili', cell.genes.pili, 'Bedre kontrol, Medium drift');
+        addGeneItem('High-Speed Retraction', cell.genes.highSpeedRetraction, 'Hurtigere Pili');
+        addGeneItem('Multiplex Pili', cell.genes.multiplexPili, 'Maksimal Pili Fart');
         addGeneItem('Megacytose', cell.genes.megacytosis, '2x Størrelse, ½ Fart, +HP');
         addGeneItem('Toxin', cell.genes.toxin, 'Giftangreb (Tryk E)');
         addGeneItem('Protease', cell.genes.protease, 'Opløs lig (Tryk R)');
@@ -532,9 +533,19 @@ function drawUI() {
 
 function updateCamera() {
     if (activeCell) {
-        // Center kamera på spilleren
-        camera.x = activeCell.x - canvas.width / 2;
-        camera.y = activeCell.y - canvas.height / 2;
+        // Beregn Target Position (Center)
+        let targetX = activeCell.x - canvas.width / 2;
+        let targetY = activeCell.y - canvas.height / 2;
+
+        // "Look Ahead" prediction removed: It caused sudden jerky jumps when state switched.
+        // Instead, rely on a very lazy camera to absorb the twitch movement.
+
+        // Smooth Camera (LERP)
+        // 0.05 = Meget blød og tungt kamera. Glider roligt efter cellen.
+        const smoothFactor = 0.05;
+        camera.x += (targetX - camera.x) * smoothFactor;
+        camera.y += (targetY - camera.y) * smoothFactor;
+
     } else {
         // RTS Style Edge Scrolling
         const edgeSize = 50;
