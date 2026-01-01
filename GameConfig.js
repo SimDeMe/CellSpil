@@ -22,6 +22,18 @@ export const GameConfig = {
             protease: 2,
             highTorque: 5,
             endocytosis: 8 // [NEW] Dyr, kræver Megacytose
+        },
+        upkeep: {
+            base: 0,
+            cilia: 0.01,
+            flagellum: 0.02,
+            highTorque: 0.03,
+            megacytosis: 0.02
+        },
+        moveCostOverride: {
+            cilia: 0.015,
+            flagellum: 0.025,
+            highTorque: 0.04
         }
     },
     Bacillus: { // The Enemy

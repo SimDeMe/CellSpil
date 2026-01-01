@@ -139,10 +139,10 @@ export class Cell {
         let moveSpeed = 0.4; // Tunet til ca. 30-40 sekunder for krydsning
 
         // Gen-specifikke omkostninger (Passive)
-        if (this.genes.megacytosis) this.atp -= 0.04;
-        if (this.genes.flagellum) this.atp -= 0.04;
-        if (this.genes.highTorque) this.atp -= 0.06; // Ekstra dyr i drift
-        if (this.genes.cilia) this.atp -= 0.02;
+        if (this.genes.megacytosis) this.atp -= GameConfig.Player.upkeep.megacytosis;
+        if (this.genes.flagellum) this.atp -= GameConfig.Player.upkeep.flagellum;
+        if (this.genes.highTorque) this.atp -= GameConfig.Player.upkeep.highTorque; // Ekstra dyr i drift
+        if (this.genes.cilia) this.atp -= GameConfig.Player.upkeep.cilia;
 
         // Megacytose: Halv fart
         if (this.genes.megacytosis) moveSpeed *= 0.5;
@@ -220,10 +220,10 @@ export class Cell {
                 // Lad os sige det koster mindre at bevæge sig langsomt
                 let moveCost = GameConfig.Player.moveCost;
                 if (this.genes.flagellum) {
-                    moveCost = 0.02;
-                    if (this.genes.highTorque) moveCost = 0.05; // Meget dyrt
+                    moveCost = GameConfig.Player.moveCostOverride.flagellum;
+                    if (this.genes.highTorque) moveCost = GameConfig.Player.moveCostOverride.highTorque; // Meget dyrt
                 }
-                else if (this.genes.cilia) moveCost = 0.015;
+                else if (this.genes.cilia) moveCost = GameConfig.Player.moveCostOverride.cilia;
 
                 // Hvis vi bevæger os langsomt (speedFactor < 1), er det billigere?
                 // Ja, lad os belønne præcision
