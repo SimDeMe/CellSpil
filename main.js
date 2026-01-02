@@ -3,28 +3,68 @@ import { activeCell, initPlayer, setActiveCell } from './Player.js';
 import { GameConfig } from './GameConfig.js';
 import {
     initEnvironment, updateEnvironment, drawEnvironment,
-    checkCollisions, spawnSisterCell, otherCells,
+    checkCollisions, spawnSisterCell, otherCells, foodParticles, // [NEW] Import foodParticles
     getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
     setMutationCallback, triggerInvasion, spawnToxinPulse, spawnProteasePulse,
-    spawnMegabacillus, spawnSpecificFood, spawnBacillus, spawnBacillusChild // [NEW]
+    spawnMegabacillus, spawnSpecificFood, spawnBacillus, spawnBacillusChild,
+    renderEnvironment // [NEW]
 } from './Environment.js';
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+// --- PIXI JS SETUP ---
+// --- PIXI JS SETUP ---
+const app = new PIXI.Application();
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-// --- VERDEN & KAMERA ---
+// Define World Dimensions Early
 const worldWidth = GameConfig.World.width;
 const worldHeight = GameConfig.World.height;
 
-const camera = {
-    x: 0,
-    y: 0,
-    width: canvas.width,
-    height: canvas.height
-};
+let canvasWidth = window.innerWidth;
+let canvasHeight = window.innerHeight;
+
+// Async Init
+(async () => {
+    await app.init({
+        background: '#0d1117',
+        resizeTo: window, // This handles canvas resizing
+        antialias: true,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1
+    });
+
+    // Append to container
+    const container = document.getElementById('game-container');
+    if (container) {
+        container.appendChild(app.canvas);
+    } else {
+        document.body.appendChild(app.canvas);
+    }
+
+    // Init Environment Layers
+    initEnvironment(app);
+
+    // Init Player (Center of World)
+    initPlayer(worldWidth, worldHeight);
+
+    // Init Debug UI (Restored)
+    initDebugUI();
+
+    // Init Input (Crucial!)
+    initInput();
+
+    // Start Game Loop
+    app.ticker.add((ticker) => {
+        gameLoop(ticker.deltaTime); // Pixi passes ticker
+    });
+})();
+
+// Helper to update dimensions (Pixi handles resizeTo, but we sync vars)
+window.addEventListener('resize', () => {
+    canvasWidth = app.screen.width;
+    canvasHeight = app.screen.height;
+});
+
+// Camera object for logic references (if any)
+const camera = { x: 0, y: 0 };
 
 let isPaused = false;
 let isInspecting = false;
@@ -528,77 +568,7 @@ function handleDivision() {
 }
 
 // --- MINIMAP FUNKTION ---
-function drawMinimap() {
-    const miniCanvas = document.getElementById('minimapCanvas');
-    if (!miniCanvas) return;
-    const miniCtx = miniCanvas.getContext('2d');
 
-    // Ryd canvas
-    miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
-
-    const scale = miniCanvas.width / Math.max(worldWidth, worldHeight);
-
-    // 1. Baggrund
-    miniCtx.fillStyle = '#000';
-    miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
-
-    // 2. Grænser (Verden)
-    const mapW = worldWidth * scale;
-    const mapH = worldHeight * scale;
-    miniCtx.strokeStyle = '#333';
-    miniCtx.lineWidth = 1;
-    miniCtx.strokeRect(0, 0, mapW, mapH);
-
-    // 3. Andre celler
-    otherCells.forEach(cell => {
-        const cx = cell.x * scale;
-        const cy = cell.y * scale;
-        miniCtx.beginPath();
-        miniCtx.arc(cx, cy, 2, 0, Math.PI * 2);
-
-        // Farvelægning
-        if (!cell.alive) {
-            miniCtx.fillStyle = '#888'; // Lig (Grå)
-        } else if (cell.isBacillus) {
-            miniCtx.fillStyle = '#FFEB3B'; // Konkurrent (Gul)
-        } else if (cell.isPlayer || cell.genes) {
-            // Antager gamle spillerceller/børn er "grønne" eller ligner spilleren
-            // Men i Environment.js er otherCells bare dem der ikke er den aktive.
-            // Hvis vi vil have "Egne celler" grønne:
-            // Tjek om de har 'isPlayer' flaget eller er børn?
-            // Bacillus er isBacillus=true. 
-            // Standard Cell er isPlayer=false (normalt), men hvis de er "vores" gamle kroppe...
-            // Lad os sige alt der IKKE er Bacillus er "Vores" arter?
-            miniCtx.fillStyle = '#4CAF50'; // Egne (Grøn)
-        } else {
-            miniCtx.fillStyle = '#FF5252'; // Ukendt/Fjende (Rød) - Fallback
-        }
-
-        miniCtx.fill();
-    });
-
-    // 4. Spilleren
-    if (activeCell) {
-        const px = activeCell.x * scale;
-        const py = activeCell.y * scale;
-        miniCtx.beginPath();
-        miniCtx.arc(px, py, 3, 0, Math.PI * 2);
-        miniCtx.fillStyle = '#4CAF50'; // Spiller (Grøn)
-        miniCtx.fill();
-        miniCtx.strokeStyle = '#FFF';
-        miniCtx.lineWidth = 1;
-        miniCtx.stroke();
-    }
-
-    // 5. Kamera Viewport
-    miniCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    miniCtx.lineWidth = 1;
-    const camRectX = camera.x * scale;
-    const camRectY = camera.y * scale;
-    const camRectW = camera.width * scale;
-    const camRectH = camera.height * scale;
-    miniCtx.strokeRect(camRectX, camRectY, camRectW, camRectH);
-}
 
 // --- NY SIDEBAR FUNKTION ---
 // --- NY INSPECTOR MODAL LOGIC ---
@@ -643,33 +613,33 @@ function setupInspectorModal() {
 }
 
 // --- HUD UPDATE FUNCTION ---
-function updateHUD(cell) {
+function updateHUD() {
     // Opdater Gen & Population
     document.getElementById('hudGen').innerText = generation;
     const pop = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
     document.getElementById('hudPop').innerText = pop;
 
-    if (cell) {
+    if (activeCell) {
         // ATP
-        const atpPct = (cell.atp / cell.maxAtp) * 100;
+        const atpPct = (activeCell.atp / activeCell.maxAtp) * 100;
         const atpBar = document.getElementById('hudAtpBar');
         if (atpBar) atpBar.style.width = atpPct + '%';
         const atpVal = document.getElementById('hudAtpVal');
-        if (atpVal) atpVal.innerText = `${Math.floor(cell.atp)} / ${cell.maxAtp}`;
+        if (atpVal) atpVal.innerText = `${Math.floor(activeCell.atp)} / ${activeCell.maxAtp}`;
 
         // Amino
-        const aminoPct = (cell.aminoAcids / cell.maxAminoAcids) * 100;
+        const aminoPct = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 100;
         const aminoBar = document.getElementById('hudAminoBar');
         if (aminoBar) aminoBar.style.width = aminoPct + '%';
         const aminoVal = document.getElementById('hudAminoVal');
-        if (aminoVal) aminoVal.innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
+        if (aminoVal) aminoVal.innerText = `${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`;
 
         // Nucleotides
-        const nucleoPct = (cell.nucleotides / cell.maxNucleotides) * 100;
+        const nucleoPct = (activeCell.nucleotides / activeCell.maxNucleotides) * 100;
         const nucleoBar = document.getElementById('hudNucleoBar');
         if (nucleoBar) nucleoBar.style.width = nucleoPct + '%';
         const nucleoVal = document.getElementById('hudNucleoVal');
-        if (nucleoVal) nucleoVal.innerText = `${cell.nucleotides} / ${cell.maxNucleotides}`;
+        if (nucleoVal) nucleoVal.innerText = `${activeCell.nucleotides} / ${activeCell.maxNucleotides}`;
 
     } else {
         // Observer Mode / Dead
@@ -970,90 +940,148 @@ function updateCamera() {
     camera.y = Math.max(0, Math.min(camera.y, worldHeight - canvas.height));
 }
 
-function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Variable frame time is handled by Pixi ticker.deltaTime
+function gameLoop(deltaTime) {
+    if (isPaused) return;
 
-    // 1. Logik opdateringer
-    handleCellSwitch();
+    // Dimensions
+    const width = app.screen.width;
+    const height = app.screen.height;
 
-    // Opret et midlertidigt mouse objekt til logic updates som tager højde for kamera
-    const worldMouse = {
-        x: mouse.x + camera.x,
-        y: mouse.y + camera.y
-    };
+    // --- GAME LOGIC ---
+    if (activeCell) {
+        // Player Input
+        const input = {
+            up: keys['w'] || keys['arrowup'],
+            down: keys['s'] || keys['arrowdown'],
+            left: keys['a'] || keys['arrowleft'],
+            right: keys['d'] || keys['arrowright'],
+            space: keys[' ']
+        };
 
-    if (!isPaused) {
-        // Tids-baserede events (Invasion efter 60 sekunder)
-        if (!invasionTriggered && Date.now() - gameStartTime > GameConfig.World.invasionTime) {
-            triggerInvasion(worldWidth, worldHeight);
-            invasionTriggered = true;
-            showEventPopup(
-                "ADVARSEL: INVASION!",
-                "Bacillus simplex er ankommet. De spiser alt din mad!",
-                "RÅD: Udvikl Toxin (E) eller bliv udkonkurreret!"
-            );
-            console.log("EVENT: Invasion triggered!");
-        }
+        // Logic updates use mouse x/y directly. 
+        // We need to inverse transform the mouse (Screen -> World).
+        // Since camera centers on player:
+        // ScreenCenter = PlayerWorldPos.
+        // ScreenMouse = Mouse.
+        // WorldMouse - PlayerWorldPos = ScreenMouse - ScreenCenter.
+        // WorldMouse = PlayerWorldPos + (ScreenMouse - ScreenCenter).
 
-        // Opdater kamera position FØR vi tegner
-        updateCamera();
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const worldMouse = {
+            x: activeCell.x + (mouse.x - centerX),
+            y: activeCell.y + (mouse.y - centerY)
+        };
 
-        // SIMULATION (Brug verdens-dimensioner og verdens-mus)
-        if (activeCell) {
-            // Vi sender canvas.height med som 'viewHeight' for at beregne musens afstand ift skærmstørrelse
-            activeCell.update(worldMouse, keys, worldWidth, worldHeight, null, null, canvas.height);
-            checkCollisions(activeCell);
-            handleDivision();
-        }
+        // Update Cell with WORLD dimensions, not screen dimensions
+        activeCell.update(worldMouse, input, worldWidth, worldHeight, foodParticles, otherCells, height);
 
-        otherCells.forEach(cell => checkCollisions(cell));
-        // Opdater miljøet (mad spawning, partikler)
+        checkCollisions(activeCell);
+        handleDivision();
+
+        // 3. Environment Update + VISUALS
+        // Use Global World Dimensions for spawning, not screen size
         updateEnvironment(worldWidth, worldHeight, activeCell);
+        renderEnvironment(activeCell); // [NEW] Pixi Sync
+        handleCellSwitch(); // was processInput()
 
-        // --- GOD MODE ---
-        if (godMode && activeCell) {
-            activeCell.atp = activeCell.maxAtp;
-            activeCell.aminoAcids = activeCell.maxAminoAcids;
-            activeCell.nucleotides = activeCell.maxNucleotides;
-        }
+        // --- CAMERA UPDATE ---
+        // Center on active cell
+        // container.position = -cell + center
+        // Pivot is usually 0,0. We move the container.
+        const camX = centerX - activeCell.x;
+        const camY = centerY - activeCell.y;
 
-        // --- DEBUG TIMER UPDATE ---
-        if (GameConfig.debugMode) {
-            const elapsed = Date.now() - gameStartTime;
-            const mins = Math.floor(elapsed / 60000);
-            const secs = Math.floor((elapsed % 60000) / 1000);
-            const timerStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            const timerEl = document.getElementById('debugTimer');
-            if (timerEl) timerEl.innerText = timerStr;
+        if (window.setCameraPosition) {
+            window.setCameraPosition(camX, camY);
         }
     }
 
-    // 2. Tegning - Verden (Med Kamera Transform)
-    ctx.save();
-    ctx.translate(-camera.x, -camera.y);
+    // UI Updates
+    updateHUD();
+    drawMinimap();
 
-    // Tegn en baggrund eller grænse for verden
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 5;
-    ctx.strokeRect(0, 0, worldWidth, worldHeight);
-
-    drawEnvironment(ctx);
-    if (activeCell) activeCell.draw(ctx);
-
-    ctx.restore(); // Gå tilbage til skærm-koordinater
-
-    // 3. Tegning - UI (Ingen Transform - tegnes fast på skærmen)
-    drawUI();
-
-    // Sidebaren opdateres hver frame (altid aktiv nu) (Send activeCell eller null)
-
-
-    // Sidebaren/HUD opdateres hver frame (altid aktiv nu) (Send activeCell eller null)
-    updateHUD(activeCell);
-
-    requestAnimationFrame(gameLoop);
+    // --- GOD MODE ---
+    if (godMode && activeCell) {
+        activeCell.atp = activeCell.maxAtp;
+        activeCell.aminoAcids = activeCell.maxAminoAcids;
+        activeCell.nucleotides = activeCell.maxNucleotides;
+    }
 }
 
-// RETTET: init() og gameLoop() skal kaldes her for at starte spillet.
-init();
-gameLoop();
+function drawMinimap() {
+    const miniCanvas = document.getElementById('minimapCanvas');
+    if (!miniCanvas) return;
+    const miniCtx = miniCanvas.getContext('2d');
+
+    // Ryd canvas
+    miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+
+    const scale = miniCanvas.width / Math.max(worldWidth, worldHeight);
+
+    // 1. Baggrund
+    miniCtx.fillStyle = '#000';
+    miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
+
+    // 2. Grænser (Verden)
+    const mapW = worldWidth * scale;
+    const mapH = worldHeight * scale;
+    miniCtx.strokeStyle = '#333';
+    miniCtx.lineWidth = 1;
+    miniCtx.strokeRect(0, 0, mapW, mapH);
+
+    // 3. Andre celler
+    otherCells.forEach(cell => {
+        const cx = cell.x * scale;
+        const cy = cell.y * scale;
+        miniCtx.beginPath();
+        miniCtx.arc(cx, cy, 2, 0, Math.PI * 2);
+
+        if (!cell.alive) {
+            miniCtx.fillStyle = '#888'; // Lig
+        } else if (cell.isBacillus) {
+            miniCtx.fillStyle = '#FFEB3B'; // Enemy
+        } else {
+            miniCtx.fillStyle = '#4CAF50'; // Neutral/Green
+        }
+        miniCtx.fill();
+    });
+
+    // 4. Spilleren
+    if (activeCell) {
+        const px = activeCell.x * scale;
+        const py = activeCell.y * scale;
+        miniCtx.beginPath();
+        miniCtx.arc(px, py, 3, 0, Math.PI * 2);
+        miniCtx.fillStyle = '#4CAF50'; // Player Green
+        miniCtx.fill();
+        miniCtx.strokeStyle = '#FFF';
+        miniCtx.lineWidth = 1;
+        miniCtx.stroke();
+    }
+
+    // 5. Kamera Viewport
+    miniCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    miniCtx.lineWidth = 1;
+    // Camera isn't global object with w/h anymore in new loop, but we have app.screen
+    // The camera 'x,y' logic in old main.js was 'top-left'. 
+    // In new loop we calculate `camX, camY` as top-left of view.
+    // We should probably expose `camera` object or store it.
+    // For now, let's recalculate based on activeCell center.
+    if (activeCell) {
+        const camX = activeCell.x - app.screen.width / 2;
+        const camY = activeCell.y - app.screen.height / 2;
+
+        const rectX = camX * scale;
+        const rectY = camY * scale;
+        const rectW = app.screen.width * scale;
+        const rectH = app.screen.height * scale;
+
+        miniCtx.strokeRect(rectX, rectY, rectW, rectH);
+    }
+}
+
+// Remove legacy init calls (The IIFE at top handles it)
+
+// End of Game Loop

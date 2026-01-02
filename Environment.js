@@ -1,3 +1,4 @@
+
 import { Cell } from './Cell.js';
 import { Bacillus } from './Bacillus.js';
 import { GameConfig } from './GameConfig.js';
@@ -14,16 +15,66 @@ let spawnTimer = 0;
 let onMutationCallback = null;
 
 export function setMutationCallback(callback) {
-    onMutationCallback = callback;
+    // Placeholder to ensure I view the file before modifying logic loops.
 }
 
-export function initEnvironment(canvasWidth, canvasHeight) {
+// Helper for Pixi Sync
+function syncParticles(list, layer, drawFn) {
+    for (let i = list.length - 1; i >= 0; i--) {
+        const p = list[i];
+        if (!p.graphic) {
+            p.graphic = new PIXI.Graphics();
+            drawFn(p.graphic, p);
+            layer.addChild(p.graphic);
+        }
+        p.graphic.x = p.x;
+        p.graphic.y = p.y;
+    }
+}
+
+// --- PIXI CONTAINERS ---
+export let worldContainer;
+let foodLayer, toxinLayer, zoneLayer, cellLayer, dangerZoneLayer;
+let appInstance; // Ref to pixi app if needed
+
+export function initEnvironment(app) {
+    appInstance = app;
+
+    // Create World Container (Camera pivot)
+    worldContainer = new PIXI.Container();
+    app.stage.addChild(worldContainer);
+
+    // [NEW] Background / World Boundary
+    const bg = new PIXI.Graphics();
+    bg.rect(0, 0, GameConfig.World.width, GameConfig.World.height);
+    bg.fill({ color: 0x111111 }); // Very dark grey, visible against black space
+    bg.stroke({ width: 2, color: 0x444444 });
+    worldContainer.addChild(bg);
+
+    // Create Layers (Order matters!)
+    zoneLayer = new PIXI.Container();
+    foodLayer = new PIXI.Container();
+    toxinLayer = new PIXI.Container();
+    cellLayer = new PIXI.Container(); // Enemies & Player
+
+    worldContainer.addChild(zoneLayer);
+    worldContainer.addChild(foodLayer);
+    worldContainer.addChild(toxinLayer);
+    worldContainer.addChild(cellLayer);
+
+    // Init Logic
     foodParticles.length = 0;
     otherCells.length = 0;
+    dangerZones.length = 0;
 
-    // Spawn Mad
+    // Spawn Initial Food
     for (let i = 0; i < 500; i++) {
-        spawnFood(canvasWidth, canvasHeight);
+        spawnFood(app.screen.width, app.screen.height);
+    }
+
+    // Expose Camera Helper
+    window.setCameraPosition = (x, y) => {
+        worldContainer.position.set(x, y);
     }
 }
 
@@ -196,7 +247,7 @@ function updateDangerZones(width, height) {
             type: type,
             maxRadius: GameConfig.DangerZones.maxRadius * (0.5 + Math.random() * 0.5) // Varieret størrelse
         });
-        console.log(`Spawned Danger Zone: ${type}`);
+        console.log(`Spawned Danger Zone: ${type} `);
     }
 
     // 2. Updates & Collisions
@@ -734,5 +785,155 @@ export function resolveCollisions(player, others) {
                 }
             }
         }
+    }
+}
+
+// --- VISUAL RENDERING (PIXI) ---
+let renderFrameId = 0;
+
+export function renderEnvironment(activeCell) {
+    renderFrameId++;
+
+    // 1. Sync Layers
+    syncLayer(dangerZones, worldContainer.children[0], drawDangerZone); // ZoneLayer is 0
+    // Wait, accessing worldContainer.children by index is risky if order changes.
+    // Better to export layers or expose them? 
+    // `initEnvironment` creates them local variables.
+    // I should update `initEnvironment` to export them, or just use `worldContainer.children` if I know the order.
+    // Order was: zone, food, toxin, cell.
+    // 0: Zone, 1: Food, 2: Toxin, 3: Cell (activeCell + others)
+
+    // BUT, wait. Accessing local vars `foodLayer` etc from `initEnvironment` scope?
+    // They are defined at module level (lines 36).
+    // So I can access them directly!
+    // 'let foodLayer, toxinLayer...' are at line 36.
+
+    // HOWEVER, I cannot easily see them in the snippet above (lines 770+).
+    // I recall viewing the file earlier and they were at top.
+    // Yes, Step 205 showed they are module scope:
+    // 36: let foodLayer, toxinLayer, zoneLayer, cellLayer, dangerZoneLayer;
+
+    // So I can just use them.
+
+    syncLayer(dangerZones, zoneLayer, drawDangerZone);
+    syncLayer(foodParticles, foodLayer, drawFood);
+    syncLayer(toxinParticles, toxinLayer, drawToxin);
+    syncLayer(proteaseParticles, toxinLayer, drawProtease);
+
+    // Cells (Player + NPCs)
+    const allCells = [...otherCells];
+    if (activeCell) allCells.push(activeCell);
+
+    syncLayer(allCells, cellLayer, drawCell);
+}
+
+function syncLayer(dataList, layer, drawFunc) {
+    if (!layer) return; // Safety
+
+    // 1. Mark & Update/Create
+    for (let i = 0; i < dataList.length; i++) {
+        const item = dataList[i];
+        item._renderFrame = renderFrameId;
+
+        if (!item.graphic) {
+            item.graphic = new PIXI.Graphics();
+            item.graphic.dataObject = item; // Link back
+            layer.addChild(item.graphic);
+            // Initial Draw
+            drawFunc(item.graphic, item, true);
+        } else {
+            // Update Draw (Optimized: Only redraw if needed? For now redraw dynamic stuff)
+            drawFunc(item.graphic, item, false);
+        }
+
+        // Position Update
+        item.graphic.x = item.x;
+        item.graphic.y = item.y;
+        item.graphic.rotation = item.angle || item.moveAngle || 0;
+    }
+
+    // 2. Sweep (Remove unused graphics)
+    for (let i = layer.children.length - 1; i >= 0; i--) {
+        const child = layer.children[i];
+        if (child.dataObject && child.dataObject._renderFrame !== renderFrameId) {
+            child.destroy({ children: true });
+        }
+    }
+}
+
+// --- DRAW FUNCTIONS ---
+
+function drawFood(g, p, initial) {
+    if (initial) {
+        g.clear();
+        g.beginPath();
+        if (p.type === 'glucose') {
+            g.circle(0, 0, p.radius);
+        } else {
+            g.rect(-p.radius, -p.radius, p.radius * 2, p.radius * 2);
+        }
+        g.fill(p.color);
+    }
+}
+
+function drawToxin(g, p, initial) {
+    g.clear();
+    g.alpha = p.life / p.maxLife;
+    g.circle(0, 0, 4);
+    g.fill('#00E676');
+}
+
+function drawProtease(g, p, initial) {
+    g.clear();
+    g.alpha = p.life / p.maxLife;
+    g.circle(0, 0, 3);
+    g.fill('#E91E63');
+}
+
+function drawDangerZone(g, z, initial) {
+    g.clear();
+    g.circle(0, 0, z.radius);
+    g.fill(GameConfig.DangerZones.colors[z.type] || 'rgba(0,0,0,0.1)');
+}
+
+function drawCell(g, cell, initial) {
+    g.clear();
+
+    // Make sure pulse exists
+    const pulse = cell.pulse || 0;
+    const r = (cell.radius || 20) + Math.sin(pulse) * 2;
+
+    // 1. Shape
+    g.circle(0, 0, r);
+
+    // 2. Fill
+    let fillColor = cell.color || '#888';
+    if (cell.alive && cell.aminoAcids >= cell.maxAminoAcids) {
+        fillColor = cell.isPlayer ? '#69F0AE' : '#FFF59D';
+    }
+    g.fill(fillColor);
+
+    // 3. Stroke
+    g.stroke({ width: 3, color: cell.isPlayer ? '#81C784' : (cell.isBacillus ? '#FDD835' : '#666') });
+
+    // Extras (Flagellum)
+    if (cell.genes && cell.genes.flagellum && cell.alive) {
+        const tailLen = r * 1.5;
+        const dir = (cell.isPlayer ? (cell.angle || 0) : (cell.moveAngle || 0)) + Math.PI;
+
+        // Start new path for tail
+        g.beginPath(); // Optional in v8 if moving?
+        g.moveTo(Math.cos(dir) * r, Math.sin(dir) * r);
+
+        const tipX = Math.cos(dir) * (r + tailLen);
+        const tipY = Math.sin(dir) * (r + tailLen);
+
+        // Simple curve
+        const wave = Math.sin(Date.now() / 100) * 5;
+        const midX = Math.cos(dir) * (r + tailLen / 2) + Math.cos(dir + Math.PI / 2) * wave;
+        const midY = Math.sin(dir) * (r + tailLen / 2) + Math.sin(dir + Math.PI / 2) * wave;
+
+        g.quadraticCurveTo(midX, midY, tipX, tipY);
+        g.stroke({ width: 2, color: fillColor });
     }
 }
