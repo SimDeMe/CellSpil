@@ -45,6 +45,12 @@ let canvasHeight = window.innerHeight;
     // Init Player (Center of World)
     initPlayer(worldWidth, worldHeight);
 
+    // Initialize Camera to Player Start
+    if (activeCell) {
+        camera.x = activeCell.x - app.screen.width / 2;
+        camera.y = activeCell.y - app.screen.height / 2;
+    }
+
     // Init Debug UI (Restored)
     initDebugUI();
 
@@ -95,12 +101,12 @@ try {
         const scaleX = worldWidth / miniCanvas.width;
         const scaleY = worldHeight / miniCanvas.height;
 
-        camera.x = (mx * scaleX) - camera.width / 2;
-        camera.y = (my * scaleY) - camera.height / 2;
+        camera.x = (mx * scaleX) - app.screen.width / 2;
+        camera.y = (my * scaleY) - app.screen.height / 2;
 
         // Clamp
-        camera.x = Math.max(0, Math.min(camera.x, worldWidth - camera.width));
-        camera.y = Math.max(0, Math.min(camera.y, worldHeight - camera.height));
+        camera.x = Math.max(0, Math.min(camera.x, worldWidth - app.screen.width));
+        camera.y = Math.max(0, Math.min(camera.y, worldHeight - app.screen.height));
     });
 } catch (e) {
     console.error("Kunne ikke finde knapperne. Husk at gemme index.html!", e);
@@ -625,6 +631,18 @@ function updateHUD() {
     const pop = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
     document.getElementById('hudPop').innerText = pop;
 
+    // Status Overlay Logic
+    const statusOverlay = document.getElementById('statusOverlay');
+    if (isPaused && !isInspecting) {
+        statusOverlay.innerText = "PAUSE";
+        statusOverlay.classList.remove('hidden');
+    } else if (isObserverMode) {
+        statusOverlay.innerText = "OBSERVER MODE";
+        statusOverlay.classList.remove('hidden');
+    } else {
+        statusOverlay.classList.add('hidden');
+    }
+
     if (activeCell) {
         // ATP
         const atpPct = (activeCell.atp / activeCell.maxAtp) * 100;
@@ -874,47 +892,11 @@ function showInspectorSidebar(show) {
     // Sidebar håndteres nu via CSS (ingen hidden class)
 }
 
-function drawUI() {
-    // UI tegnes OVENPÅ alt
-
-    if (activeCell) {
-        // ATP & Amino bars removed from bottom-left (Redundant)
-    } else {
-        // OBSERVE MODE UI Overlay
-        ctx.fillStyle = 'rgba(171, 71, 188, 0.2)';
-        ctx.fillRect(0, canvas.height - 80, 250, 80);
-        ctx.fillStyle = '#E1BEE7';
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText("👁 OBSERVER MODE", 20, canvas.height - 50);
-        ctx.font = '12px Arial';
-        ctx.fillText("Klik på en celle for at overtage styringen", 20, canvas.height - 30);
-    }
-
-    ctx.fillStyle = '#FFF';
-    ctx.fillText(`Generation: ${generation} | Celler i alt: ${otherCells.length + (activeCell ? 1 : 0)}`, 20, 30);
-
-    // Debug info om verden
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.fillText(`World: ${worldWidth}x${worldHeight} | Cam: ${Math.floor(camera.x)},${Math.floor(camera.y)}`, 20, 70);
-
-    if (isPaused && !isInspecting) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'white';
-        ctx.font = '50px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText("PAUSE", canvas.width / 2, canvas.height / 2);
-    }
-
-    // Tegn Minimap i sidebaren, ikke på main canvas
-    drawMinimap();
-}
-
 function updateCamera() {
     if (activeCell) {
         // Beregn Target Position (Center)
-        let targetX = activeCell.x - canvas.width / 2;
-        let targetY = activeCell.y - canvas.height / 2;
+        let targetX = activeCell.x - app.screen.width / 2;
+        let targetY = activeCell.y - app.screen.height / 2;
 
 
 
@@ -930,9 +912,9 @@ function updateCamera() {
         const speed = 15;
 
         if (mouse.x < edgeSize) camera.x -= speed;
-        if (mouse.x > canvas.width - edgeSize) camera.x += speed;
+        if (mouse.x > app.screen.width - edgeSize) camera.x += speed;
         if (mouse.y < edgeSize) camera.y -= speed;
-        if (mouse.y > canvas.height - edgeSize) camera.y += speed;
+        if (mouse.y > app.screen.height - edgeSize) camera.y += speed;
     }
 
     if (isNaN(camera.x) || isNaN(camera.y)) {
@@ -942,8 +924,8 @@ function updateCamera() {
     }
 
     // Hold kamera inden for verdenens grænser
-    camera.x = Math.max(0, Math.min(camera.x, worldWidth - canvas.width));
-    camera.y = Math.max(0, Math.min(camera.y, worldHeight - canvas.height));
+    camera.x = Math.max(0, Math.min(camera.x, worldWidth - app.screen.width));
+    camera.y = Math.max(0, Math.min(camera.y, worldHeight - app.screen.height));
 }
 
 // Variable frame time is handled by Pixi ticker.deltaTime
@@ -976,8 +958,8 @@ function gameLoop(deltaTime) {
         const centerX = width / 2;
         const centerY = height / 2;
         const worldMouse = {
-            x: activeCell.x + (mouse.x - centerX),
-            y: activeCell.y + (mouse.y - centerY)
+            x: mouse.x + camera.x,
+            y: mouse.y + camera.y
         };
 
         // Update Cell with WORLD dimensions, not screen dimensions
@@ -993,14 +975,12 @@ function gameLoop(deltaTime) {
         handleCellSwitch(); // was processInput()
 
         // --- CAMERA UPDATE ---
-        // Center on active cell
-        // container.position = -cell + center
-        // Pivot is usually 0,0. We move the container.
-        const camX = centerX - activeCell.x;
-        const camY = centerY - activeCell.y;
+        updateCamera();
 
+        // Apply Camera to World Container
         if (window.setCameraPosition) {
-            window.setCameraPosition(camX, camY);
+            // Container position is inverse of camera (if camera moves right, world moves left)
+            window.setCameraPosition(-camera.x, -camera.y);
         }
     }
 

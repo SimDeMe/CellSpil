@@ -31,6 +31,19 @@ button:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 
+#statusOverlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    pointer-events: none;
+    z-index: 1000;
+}
+
 #debugTimer {
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid #AB47BC;

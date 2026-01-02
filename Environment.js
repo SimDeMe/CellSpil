@@ -297,28 +297,6 @@ function checkZoneDamage(cell, zone) {
             return; // Immune
         }
 
-        // Antibiotic specific check: Only harms Gram Negative
-        // Actually, logic is: Gram Pos is immune. So Gram Neg takes damage.
-        // Toxin specific: Hits everyone? My plan said "Toxin: Damages generic cells (Gram Positive protects)".
-        // So effectively, simple logic: IF NOT GramPositive -> Take Damage.
-        // Wait, did User say Toxin hits everyone regardless?
-        // "There must ALSO be a type of antibiotic that ONLY hits gram-negative".
-        // "Toxins ... and some with antibiotics".
-        // "Gram positive ... gives protection against toxins and antibiotics".
-        // So Gram Positive is the SUPER SHIELD.
-        // Therefore logic is: If GramPositive -> No Damage.
-        // Else -> Damage.
-        // Is there any difference between Toxin and Antibiotic then?
-        // User: "There must ALSO be a type of antibiotic that ONLY hits gram-negative".
-        // Implication: The OTHER type (Toxin) hits GRAM POSITIVE too?
-        // BUT User also said: "Gram positive ... gives protection against toxins".
-        // Contradiction?
-        // Let's implement as:
-        // Gram Positive protects against Antibiotics AND Toxins.
-        // So what's the difference? Maybe nothing mechanic-wise yet, just flavor/color?
-        // Or maybe Toxin is stronger?
-        // Let's keep distinct types for future expansion, but share logic now.
-
         // Apply Damage
         const dmg = GameConfig.DangerZones.damageRate;
         cell.atp -= dmg;
