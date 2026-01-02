@@ -68,9 +68,8 @@ export function initEnvironment(app) {
     dangerZones.length = 0;
 
     // Spawn Initial Food
-    for (let i = 0; i < 500; i++) {
-        spawnFood(app.screen.width, app.screen.height);
-    }
+    // Spawn Initial Food (Clumped)
+    spawnClumpedFood(GameConfig.World.width, GameConfig.World.height, 500);
 
     // Expose Camera Helper
     window.setCameraPosition = (x, y) => {
@@ -570,6 +569,61 @@ export function spawnSpecificFood(type, x, y) {
         vy: 0
     };
     foodParticles.push(particle);
+}
+
+// [NEW] Clumped Spawning Logic
+export function spawnClumpedFood(mapWidth, mapHeight, totalCount) {
+    // 1. Definer antal klynger (clusters)
+    const clusterCount = 20;
+    const particlesPerCluster = Math.floor(totalCount / clusterCount);
+    const wanderCount = totalCount % clusterCount; // Resterende spredes tilfældigt
+
+    // 2. Generer cluster centre
+    const clusters = [];
+    for (let i = 0; i < clusterCount; i++) {
+        clusters.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            radius: 300 + Math.random() * 400 // Radius 300-700
+        });
+    }
+
+    // 3. Spawn partikler omkring centrene
+    for (let c = 0; c < clusterCount; c++) {
+        const cluster = clusters[c];
+        for (let p = 0; p < particlesPerCluster; p++) {
+            // Tilfældig position i cirklen (bruger kvadratrod for jævn fordeling, men vi vil faktisk gerne have det tættere i midten for 'clump' effekt, så vi undlader sqrt eller bruger gaussian hvis vi ville være fancy. Simpel random * random er ok)
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * cluster.radius;
+
+            let px = cluster.x + Math.cos(angle) * dist;
+            let py = cluster.y + Math.sin(angle) * dist;
+
+            // Clamp til verden
+            px = Math.max(0, Math.min(px, mapWidth));
+            py = Math.max(0, Math.min(py, mapHeight));
+
+            spawnRandomFoodAt(px, py);
+        }
+    }
+
+    // 4. Spawn 'wanderers' (tilfældigt over hele kortet)
+    for (let i = 0; i < wanderCount; i++) {
+        spawnFood(mapWidth, mapHeight);
+    }
+}
+
+function spawnRandomFoodAt(x, y) {
+    const typeRandom = Math.random();
+    let type = 'glucose';
+
+    if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
+        type = 'nucleotide';
+    } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
+        type = 'amino';
+    }
+
+    spawnSpecificFood(type, x, y);
 }
 
 export function spawnFood(width, height) {
