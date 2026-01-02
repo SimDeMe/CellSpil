@@ -7,7 +7,7 @@ import {
     getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
     setMutationCallback, triggerInvasion, spawnToxinPulse, spawnProteasePulse,
     spawnMegabacillus, spawnSpecificFood, spawnBacillus, spawnBacillusChild,
-    renderEnvironment // [NEW]
+    renderEnvironment, attemptMutation // [NEW]
 } from './Environment.js';
 
 // --- PIXI JS SETUP ---
@@ -247,7 +247,8 @@ function showMutationPopup(mutationType, newCell = null) {
     }
 
     // AUTO-SWITCH: Hvis vi har fået en ny celle, skift til den!
-    if (newCell) {
+    // [FIX] Dont switch if we mutated the player directly (newCell === activeCell)
+    if (newCell && newCell !== activeCell) {
         // Gem den gamle spiller reference før vi skifter
         const oldPlayer = activeCell;
 
@@ -529,7 +530,7 @@ function handleCellSwitch() {
 
 function handleDivision() {
     // 1. Check for Trigger (Key Press + Resources + Not already dividing)
-    if (activeCell && keys.d && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
+    if (activeCell && keys.m && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
         if (!activeCell.isDividing) {
             activeCell.startDivision();
             // Optional: Play a sound? "glop"
@@ -543,15 +544,20 @@ function handleDivision() {
             // --- SPAWN LOGIC ---
             const mother = activeCell;
 
-            // Spawn søster (true = spillerens barn)
+            // 1. MUTATION: Try to evolve the MOTHER (Player)
+            attemptMutation(mother);
+
+            // 2. SPAWN SISTER: Clone of current genes (or pre-mutation? Logic uses mother.genes ref)
+            // Since we mutated mother instantly, sister gets same genes. 
+            // That's fine, evolved parent makes evolved offspring.
             if (mother.isBacillus) {
-                // [FIX] Spawn Bacillus child if mother is Bacillus/Megabacillus
                 spawnBacillusChild(mother.x, mother.y, mother.isMegabacillus);
             } else {
                 spawnSisterCell(mother.x, mother.y, mother.genes, true);
             }
 
-            // Reset moderen
+            // Reset moderen (Cost of division)
+            mother.aminoAcids = 0;
             mother.aminoAcids = 0;
             mother.radius = mother.minRadius;
             // Shift mother slightly left/right against child?
@@ -562,7 +568,7 @@ function handleDivision() {
 
             // Nulstil division state
             mother.finalizeDivision();
-            keys.d = false; // Reset key to prevent double spawn
+            keys.m = false; // Reset key to prevent double spawn
         }
     }
 }
