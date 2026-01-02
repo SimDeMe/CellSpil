@@ -235,7 +235,7 @@ export class Cell {
         // Apply Movement
         if (this.isPlayer && inputKeys) {
             // ... (Cheats and Abilities logic) ...
-            if (inputKeys.s && inputKeys.m) {
+            if (inputKeys.s && inputKeys.c) { // S + C = Cheat
                 this.atp = this.maxAtp;
                 this.aminoAcids = this.maxAminoAcids;
                 console.log("CHEAT: Full Resources");
@@ -271,8 +271,35 @@ export class Cell {
             const dy = mouse.y - this.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance > this.radius && !this.genes.pili) {
-                // NORMAL MOVEMENT (Flagellum or Drift)
+            // 1. Check for Key Input (Priority over Mouse)
+            let moveX = 0;
+            let moveY = 0;
+            if (inputKeys && (inputKeys.up || inputKeys.down || inputKeys.left || inputKeys.right)) {
+                if (inputKeys.up) moveY -= 1;
+                if (inputKeys.down) moveY += 1;
+                if (inputKeys.left) moveX -= 1;
+                if (inputKeys.right) moveX += 1;
+            }
+
+            if ((moveX !== 0 || moveY !== 0) && !this.genes.pili) {
+                // KEYBOARD MOVEMENT
+                this.angle = Math.atan2(moveY, moveX);
+
+                // Normalize vector
+                const len = Math.sqrt(moveX * moveX + moveY * moveY);
+                // Apply full speed immediately for responsive feel
+                const totalSpeed = moveSpeed;
+
+                this.x += (moveX / len) * totalSpeed;
+                this.y += (moveY / len) * totalSpeed;
+
+                // ATP Cost
+                let cost = GameConfig.Player.moveCost;
+                if (this.genes.flagellum) cost = GameConfig.Player.moveCostOverride.flagellum;
+                this.atp -= cost;
+
+            } else if (distance > this.radius && !this.genes.pili) {
+                // MOUSE FOLLOWER (Fallback if no keys pressed)
                 this.angle = Math.atan2(dy, dx);
                 let speedFactor = (distance - this.radius) / (viewHeight * 0.5 - this.radius);
                 if (speedFactor > 1) speedFactor = 1;

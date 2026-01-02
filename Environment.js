@@ -15,7 +15,7 @@ let spawnTimer = 0;
 let onMutationCallback = null;
 
 export function setMutationCallback(callback) {
-    // Placeholder to ensure I view the file before modifying logic loops.
+    onMutationCallback = callback;
 }
 
 // Helper for Pixi Sync
@@ -475,74 +475,61 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
 
 
     // Mutation: 40% chance for en ny mutation (FREMADRETTET)
+    // Simplified Spawn
+    sister.updateMaxGrowth();
+
+    if (!sister.isPlayer) {
+        otherCells.push(sister);
+    }
+}
+
+export function attemptMutation(cell) {
     let mutated = false;
     if (Math.random() < GameConfig.Player.mutationRate) {
-        // Liste af mulige mutationer som cellen ikke har endnu
         const possibleMutations = [];
-        const g = sister.genes;
+        const g = cell.genes;
 
-        // Rækkefølge: Movement -> Toxin -> Protease
-
-        // TIER 1: MOVEMENT (Pili OR Flagellum) - Exclusive Access
+        // TIER 1: MOVEMENT
         if (!g.pili && !g.flagellum) {
             possibleMutations.push('pili', 'flagellum');
         }
         else if (!g.toxin || !g.protease || !g.gramPositive) {
-            // TIER 2: Toxin AND Protease AND Gram Positive - Exclusive Access
-            // Spilleren skal udvikle disse EVNER før de kan opgradere dem
+            // TIER 2: Abilities
             if (!g.toxin) possibleMutations.push('toxin');
             if (!g.protease) possibleMutations.push('protease');
             if (!g.gramPositive) possibleMutations.push('gramPositive');
         }
         else {
-            // TIER 3: Movement Upgrades & Size Upgrades
-
-            // Pili Upgrades
+            // TIER 3: Upgrades
             if (g.pili) {
                 if (!g.highSpeedRetraction) possibleMutations.push('highSpeedRetraction');
                 if (!g.multiplexPili) possibleMutations.push('multiplexPili');
             }
-
-            // Flagellum upgrades
             if (g.flagellum) {
                 if (!g.highTorque) possibleMutations.push('highTorque');
             }
-
-            // Size Upgrade
             if (!g.megacytosis) possibleMutations.push('megacytosis');
 
-            // TIER 4: Endocytosis (Locked behind Megacytosis)
+            // TIER 4
             if (g.megacytosis && !g.endocytosis) {
                 possibleMutations.push('endocytosis');
             }
         }
 
         if (possibleMutations.length > 0) {
-            // Vi deklarerer variabelen her så den er tilgængelig i scopet
             const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
-            sister.genes[newMutation] = true;
-            mutated = true;
+            cell.genes[newMutation] = true;
+            mutated = true; // Unused var but good for tracking
 
-            console.log("MUTATION! Ny gen: " + newMutation);
+            console.log("MUTATION ON ACTIVE CELL! New gene: " + newMutation);
 
-            // Trigger UI popup hvis en mutation skete OG det er spillerens barn
-            if (onMutationCallback && isPlayerChild) {
-                onMutationCallback(newMutation, sister);
+            if (onMutationCallback) {
+                onMutationCallback(newMutation, cell);
             }
         }
 
-        // VIGTIGT: Opdater parametre efter mutationer/arv er sat
-        sister.updateMaxGrowth();
-    } else {
-        // Opdater også hvis ingen mutation (bare arv) for at sætte size korrekt
-        sister.updateMaxGrowth();
-    }
-
-    // Tilføj til verden! (VIGTIGT: Ellers findes den ikke)
-    // Hvis det er player child og mutation callback kaldes, bliver den MÅSKE activeCell i stedet midlertidigt.
-    // Hvis den ER blevet spiller, må den IKKE være i otherCells (NPC listen).
-    if (!sister.isPlayer) {
-        otherCells.push(sister);
+        // Update stats
+        cell.updateMaxGrowth();
     }
 }
 
