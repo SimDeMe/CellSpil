@@ -885,14 +885,16 @@ function drawCell(g, cell, initial) {
     // 1. Extras (Flagellum) - DRAWN FIRST (BEHIND)
     if (cell.genes && cell.genes.flagellum && cell.alive) {
         const tailLen = r * 2.5; // Longer tail
-        const dir = (cell.isPlayer ? (cell.angle || 0) : (cell.moveAngle || 0)) + Math.PI;
+
+        // Since we are drawing in local space (graphic is rotated), "Back" is simply Math.PI
+        const dir = Math.PI;
 
         // Sine Wave Tail
         const segments = 10;
         const step = tailLen / segments;
         const phase = cell._wavePhase || 0;
 
-        // Perpendicular vector for wave amplitude
+        // Perpendicular vector for wave amplitude (relative to local Back)
         const perpX = Math.cos(dir + Math.PI / 2);
         const perpY = Math.sin(dir + Math.PI / 2);
 
@@ -906,8 +908,6 @@ function drawCell(g, cell, initial) {
 
         for (let i = 1; i <= segments; i++) {
             const dist = i * step;
-            // Tapering amplitude: grows then shrinks slightly? Or just constant?
-            // Real flagella are constant helix, projected looks like constant sine.
             const amplitude = 5;
 
             // Wave function: sin(k*x - w*t)
