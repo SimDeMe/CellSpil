@@ -18,6 +18,8 @@ export function setActiveCell(newCell) {
 
     // Gør den nye til Spiller
     activeCell = newCell;
-    activeCell.isPlayer = true;
-    activeCell.color = '#4CAF50';
+    if (activeCell) {
+        activeCell.isPlayer = true;
+        activeCell.color = '#4CAF50';
+    }
 }

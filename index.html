@@ -14,7 +14,8 @@
         <button id="inspectBtn">🔍 INSPECT</button>
         <button id="observeBtn" style="border-color: #AB47BC; color: #AB47BC;">👁 OBSERVE</button>
         <button id="apoBtn" style="border-color: #ff5252; color: #ff5252;">☠ APOPTOSE</button>
-
+        <button id="debugBtn" class="hidden">🐛 DEBUG</button>
+        <div id="debugTimer" class="hidden">00:00</div>
     </div>
 
     <!-- Mutation Popup (Moved out of ui-layer to allow proper centering) -->
@@ -25,54 +26,107 @@
     </div>
 
     <!-- Inspector Sidebar (Always Active) -->
-    <div id="inspectorSidebar">
+    <!-- Inspector Modal (Replaces Sidebar) -->
+    <div id="inspectorModal" class="inspector-modal hidden">
+        <div class="modal-header">
+            <h2>INSPECT</h2>
+            <button id="closeInspectBtn" class="close-btn">X</button>
+        </div>
+
+        <div class="modal-tabs">
+            <button class="modal-tab-btn active" data-tab="tabMutations">🧬 Mutationer</button>
+            <button class="modal-tab-btn" data-tab="tabMetabolism">⚡ Metabolisme</button>
+            <button class="modal-tab-btn" data-tab="tabCells">🦠 Celler</button>
+        </div>
+
+        <div class="modal-body">
+            <!-- TAB 1: MUTATIONER -->
+            <div id="tabMutations" class="modal-tab-content active">
+                <div id="mutationTreeContainer"></div>
+            </div>
+
+            <!-- TAB 2: METABOLISME -->
+            <div id="tabMetabolism" class="modal-tab-content">
+                <div id="metabolismContainer">
+                    <!-- Indhold dynamisk genereret -->
+                </div>
+            </div>
+
+            <!-- TAB 3: CELLER -->
+            <div id="tabCells" class="modal-tab-content">
+                <div id="cellListContainer">
+                    <!-- Liste af celler genereres her -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Persistent HUD (Right Panel) -->
+    <div id="gameHUD">
         <canvas id="minimapCanvas" width="200" height="200"></canvas>
-        <div class="sidebar-content">
+        <div class="hud-content">
             <div class="stat-group">
-                <label>Generation:</label> <span id="inspGen">0</span>
+                <label>Generation:</label> <span id="hudGen">0</span>
             </div>
             <div class="stat-group">
                 <label>ATP:</label>
                 <div class="bar-container">
-                    <div id="inspAtpBar" class="bar"></div>
+                    <div id="hudAtpBar" class="bar"></div>
                 </div>
-                <span id="inspAtpVal">0/0</span>
+                <span id="hudAtpVal">0/0</span>
             </div>
             <div class="stat-group">
                 <label>Aminosyrer:</label>
                 <div class="bar-container">
-                    <div id="inspAminoBar" class="bar amino"></div>
+                    <div id="hudAminoBar" class="bar amino"></div>
                 </div>
-                <span id="inspAminoVal">0/0</span>
+                <span id="hudAminoVal">0/0</span>
             </div>
-
             <div class="stat-group">
                 <label>Nucleotider:</label>
                 <div class="bar-container">
-                    <div id="inspNucleoBar" class="bar nucleo"></div>
+                    <div id="hudNucleoBar" class="bar nucleo"></div>
                 </div>
-                <span id="inspNucleoVal">0/0</span>
+                <span id="hudNucleoVal">0/0</span>
             </div>
-
-            <!-- TABS -->
-            <div class="inspector-tabs">
-                <button class="tab-btn active" id="tabBtnTree">EVOSITION</button>
-                <button class="tab-btn" id="tabBtnMission">MISSION</button>
-            </div>
-
-            <!-- CONTENT: EVOLUTION TREE -->
-            <div id="tabContentTree" class="tab-content active">
-                <div id="inspTreeRoot"></div>
-            </div>
-
-            <!-- CONTENT: MISSION -->
-            <div id="tabContentMission" class="tab-content">
-                <div id="inspMissionRoot"></div>
+            <div class="stat-group">
+                <label>Population:</label> <span id="hudPop">0</span>
             </div>
         </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
+    <!-- DEBUG UI -->
+    <!-- DEBUG UI -->
+
+    <div id="debugMenu" class="modal hidden">
+        <div class="modal-content debug-content">
+            <div class="modal-header">
+                <h2>Debug Menu</h2>
+                <button id="closeDebugBtn" class="close-btn">&times;</button>
+            </div>
+
+            <div class="debug-section">
+                <h3>Spawn Entity</h3>
+                <div class="debug-controls">
+                    <button onclick="window.debugSpawn('glucose')">Glucose</button>
+                    <button onclick="window.debugSpawn('amino')">Amino Acid</button>
+                    <button onclick="window.debugSpawn('nucleotide')">Nucleotide</button>
+                    <br>
+                    <button onclick="window.debugSpawn('bacillus')">Bacillus</button>
+                    <button onclick="window.debugSpawn('megabacillus')">Megabacillus</button>
+                </div>
+            </div>
+
+            <div class="debug-section">
+                <h3>Player Mutations</h3>
+                <div class="debug-toggles" id="debugMutationList">
+                    <!-- Checkboxes generated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="main.js"></script>
 </body>
 

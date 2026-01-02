@@ -27,6 +27,13 @@ export function initEnvironment(canvasWidth, canvasHeight) {
     }
 }
 
+export function spawnBacillus(canvasWidth, canvasHeight) {
+    const x = Math.random() * canvasWidth;
+    const y = Math.random() * canvasHeight;
+    const bac = new Bacillus(x, y);
+    otherCells.push(bac);
+}
+
 export function triggerInvasion(canvasWidth, canvasHeight) {
     // Spawn Bacillus (20 stk)
     for (let i = 0; i < 20; i++) {
@@ -37,9 +44,23 @@ export function triggerInvasion(canvasWidth, canvasHeight) {
     }
 }
 
+export function spawnMegabacillus(canvasWidth, canvasHeight) {
+    const count = GameConfig.Megabacillus.count;
+    for (let i = 0; i < count; i++) {
+        const x = Math.random() * canvasWidth;
+        const y = Math.random() * canvasHeight;
+        const mega = new Bacillus(x, y, true); // true = Megabacillus
+        otherCells.push(mega);
+    }
+    console.log("WARNING: Megabacillus Spawned!");
+}
+
 // Toxin System
 export const toxinParticles = [];
 export const proteaseParticles = [];
+export const dangerZones = []; // [NEW] Environmental Hazards
+let dangerZoneSpawnTimer = 0;
+let nextZoneSpawnTime = 600; // Start fast for debug/first spawn
 
 export function spawnToxinPulse(x, y) {
     // Spawn 20 partikler i en cirkel
@@ -96,8 +117,17 @@ function updateToxinParticles(canvasWidth, canvasHeight) {
             if (dist < cell.radius) {
                 // Skade!
                 if (!cell.isPlayer) {
-                    cell.alive = false;
-                    console.log("Celle dræbt af toxin!");
+                    // [NEW] Gram Positive (Defense)
+                    if (cell.genes && cell.genes.gramPositive) {
+                        // Immune to toxin!
+                    } else {
+                        cell.alive = false;
+                        if (cell.isMegabacillus) {
+                            console.log("Megabacillus dræbt af toxin!");
+                        } else {
+                            console.log("Celle dræbt af toxin!");
+                        }
+                    }
                 }
 
                 toxinParticles.splice(i, 1); // Partikel brugt
@@ -148,6 +178,103 @@ function updateProteaseParticles(canvasWidth, canvasHeight) {
     }
 }
 
+function updateDangerZones(width, height) {
+    // 1. Spawning
+    dangerZoneSpawnTimer++;
+    if (dangerZoneSpawnTimer > nextZoneSpawnTime) {
+        dangerZoneSpawnTimer = 0;
+        nextZoneSpawnTime = GameConfig.DangerZones.spawnIntervalMin + Math.random() * (GameConfig.DangerZones.spawnIntervalMax - GameConfig.DangerZones.spawnIntervalMin);
+
+        // Spawn
+        const type = Math.random() > 0.5 ? 'toxin' : 'antibiotic';
+        dangerZones.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            radius: 0,
+            state: 'growing', // growing, stable, shrinking
+            timer: 0,
+            type: type,
+            maxRadius: GameConfig.DangerZones.maxRadius * (0.5 + Math.random() * 0.5) // Varieret størrelse
+        });
+        console.log(`Spawned Danger Zone: ${type}`);
+    }
+
+    // 2. Updates & Collisions
+    for (let i = dangerZones.length - 1; i >= 0; i--) {
+        const zone = dangerZones[i];
+
+        // Lifecycle
+        if (zone.state === 'growing') {
+            zone.radius += GameConfig.DangerZones.growthSpeed;
+            if (zone.radius >= zone.maxRadius) {
+                zone.radius = zone.maxRadius;
+                zone.state = 'stable';
+                zone.timer = GameConfig.DangerZones.duration;
+            }
+        } else if (zone.state === 'stable') {
+            zone.timer--;
+            if (zone.timer <= 0) {
+                zone.state = 'shrinking';
+            }
+        } else if (zone.state === 'shrinking') {
+            zone.radius -= GameConfig.DangerZones.growthSpeed;
+            if (zone.radius <= 0) {
+                dangerZones.splice(i, 1);
+                continue;
+            }
+        }
+
+        // Collisions / Damage
+        // Check ALL cells (Player + NPCs)
+        // We need access to 'otherCells' (global here) AND 'activeCell' (passed to updateEnvironment)
+        // Let's make a helper or just iterate here.
+        // We will do it in 'checkAllZoneCollisions' called below, or inline here.
+        // Inline here is efficient since we have the zone loop.
+    }
+}
+
+function checkZoneDamage(cell, zone) {
+    if (!cell.alive) return;
+
+    const dx = cell.x - zone.x;
+    const dy = cell.y - zone.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < zone.radius) {
+        // HIT! Check Immunity (Gram Positive protects against BOTH)
+        if (cell.genes && cell.genes.gramPositive) {
+            return; // Immune
+        }
+
+        // Antibiotic specific check: Only harms Gram Negative
+        // Actually, logic is: Gram Pos is immune. So Gram Neg takes damage.
+        // Toxin specific: Hits everyone? My plan said "Toxin: Damages generic cells (Gram Positive protects)".
+        // So effectively, simple logic: IF NOT GramPositive -> Take Damage.
+        // Wait, did User say Toxin hits everyone regardless?
+        // "There must ALSO be a type of antibiotic that ONLY hits gram-negative".
+        // "Toxins ... and some with antibiotics".
+        // "Gram positive ... gives protection against toxins and antibiotics".
+        // So Gram Positive is the SUPER SHIELD.
+        // Therefore logic is: If GramPositive -> No Damage.
+        // Else -> Damage.
+        // Is there any difference between Toxin and Antibiotic then?
+        // User: "There must ALSO be a type of antibiotic that ONLY hits gram-negative".
+        // Implication: The OTHER type (Toxin) hits GRAM POSITIVE too?
+        // BUT User also said: "Gram positive ... gives protection against toxins".
+        // Contradiction?
+        // Let's implement as:
+        // Gram Positive protects against Antibiotics AND Toxins.
+        // So what's the difference? Maybe nothing mechanic-wise yet, just flavor/color?
+        // Or maybe Toxin is stronger?
+        // Let's keep distinct types for future expansion, but share logic now.
+
+        // Apply Damage
+        const dmg = GameConfig.DangerZones.damageRate;
+        cell.atp -= dmg;
+        cell.aminoAcids -= dmg;
+        cell.isTakingDamage = true; // For visual blink
+    }
+}
 
 export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     spawnTimer++;
@@ -158,6 +285,30 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
 
     updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
     updateProteaseParticles(canvasWidth, canvasHeight); // Protease Update
+    updateDangerZones(canvasWidth, canvasHeight); // [NEW]
+
+    // Collision Check for Zones (Separate loop to be clean or inside updateDangerZones?)
+    // Inside updateDangerZones we only iterated zones. checking collisions there means N_zones * N_cells.
+    // Let's do it there.
+    dangerZones.forEach(z => {
+        if (activeCell) checkZoneDamage(activeCell, z);
+        otherCells.forEach(c => checkZoneDamage(c, z));
+    });
+
+    // --- MEGABACILLUS SPAWN CHECK ---
+    if (!triggerInvasion.megaSpawned && GameConfig.Megabacillus) {
+        // Use a static property or global to track if spawned? 
+        // Better: triggerInvasion is a function, we can hang a prop on it or use a separate flag.
+        // Let's use a module-level variable defined above.
+    }
+
+    // Check Timer
+    // Environment doesn't track game time directly, main.js does.
+    // However, updateEnvironment is called every frame.
+    // Let's handle spawning in main.js where gameStartTime is, OR pass time delta here.
+    // Actually, Environment.js has 'spawnTimer' for food, so it has frame counting.
+    // But 'gameStartTime' is in main.js.
+    // Let's add a `spawnMegabacillus` function and call it from main.js when time matches.
 
     if (activeCell) {
         resolveCollisions(activeCell, otherCells);
@@ -241,7 +392,8 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
 
         // Her opdaterer vi NPC'erne (Bacillus og andre)
         // Send foodParticles med så Bacillus kan finde mad, og otherCells for separation
-        cell.update(null, null, canvasWidth, canvasHeight, foodParticles, otherCells);
+        // [NEW] Send activeCell med så Megabacillus kan jage spilleren
+        cell.update(null, null, canvasWidth, canvasHeight, foodParticles, otherCells, activeCell);
 
         // Division Logic
         if (cell.alive) {
@@ -275,6 +427,14 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     }
 }
 
+export function spawnBacillusChild(x, y, isMega) {
+    // [NEW] Helper for possessed Bacillus division
+    const child = new Bacillus(x, y, isMega);
+    // Inherit stats? Bacillus stats are fixed by type usually, maybe genes?
+    // For now, new fresh Bacillus is fine.
+    otherCells.push(child);
+}
+
 export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false) {
     const sister = new Cell(x, y, false);
     sister.radius = 20;
@@ -283,6 +443,7 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
     if (motherGenes) {
         sister.genes = { ...motherGenes };
     }
+
 
     // Mutation: 40% chance for en ny mutation (FREMADRETTET)
     let mutated = false;
@@ -297,11 +458,12 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
         if (!g.pili && !g.flagellum) {
             possibleMutations.push('pili', 'flagellum');
         }
-        else if (!g.toxin || !g.protease) {
-            // TIER 2: Toxin AND Protease - Exclusive Access
+        else if (!g.toxin || !g.protease || !g.gramPositive) {
+            // TIER 2: Toxin AND Protease AND Gram Positive - Exclusive Access
             // Spilleren skal udvikle disse EVNER før de kan opgradere dem
             if (!g.toxin) possibleMutations.push('toxin');
             if (!g.protease) possibleMutations.push('protease');
+            if (!g.gramPositive) possibleMutations.push('gramPositive');
         }
         else {
             // TIER 3: Movement Upgrades & Size Upgrades
@@ -380,7 +542,21 @@ export function addCellToEnvironment(cellToAdd) {
     otherCells.push(cellToAdd);
 }
 
-function spawnFood(width, height) {
+export function spawnSpecificFood(type, x, y) {
+    const particle = {
+        x: x,
+        y: y,
+        type: type, // 'glucose', 'amino', 'nucleotide'
+        radius: (type === 'glucose') ? 3 : 4,
+        color: (type === 'glucose') ? '#FFEB3B' : (type === 'amino' ? '#2196F3' : '#F44336'),
+        driftAngle: Math.random() * Math.PI * 2,
+        vx: 0,
+        vy: 0
+    };
+    foodParticles.push(particle);
+}
+
+export function spawnFood(width, height) {
     const typeRandom = Math.random();
     let particle = {
         x: Math.random() * width,
@@ -407,6 +583,18 @@ function spawnFood(width, height) {
 }
 
 export function drawEnvironment(ctx) {
+    // [NEW] Draw Danger Zones first (Background)
+    dangerZones.forEach(zone => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+        ctx.fillStyle = GameConfig.DangerZones.colors[zone.type] || 'rgba(0,0,0,0.1)';
+        ctx.fill();
+        // Soft edge? Radial gradient would be nice but expensive. keeping simple for now.
+        ctx.restore();
+    });
+
+    // Draw Food
     foodParticles.forEach(food => {
         ctx.beginPath();
         if (food.type === 'glucose') {

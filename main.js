@@ -5,7 +5,8 @@ import {
     initEnvironment, updateEnvironment, drawEnvironment,
     checkCollisions, spawnSisterCell, otherCells,
     getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
-    setMutationCallback, triggerInvasion, spawnToxinPulse, spawnProteasePulse
+    setMutationCallback, triggerInvasion, spawnToxinPulse, spawnProteasePulse,
+    spawnMegabacillus, spawnSpecificFood, spawnBacillus, spawnBacillusChild // [NEW]
 } from './Environment.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -31,6 +32,7 @@ let isObserverMode = false;
 let generation = 1;
 let gameStartTime = Date.now();
 let invasionTriggered = false;
+let godMode = false; // [NEW]
 
 // --- KNAPPER OG HÅNDTERING ---
 try {
@@ -95,8 +97,16 @@ function toggleInspect() {
     }
     isInspecting = !isInspecting;
 
-    // Vis/Skjul sidebar
-    showInspectorSidebar(isInspecting);
+    // Vis/Skjul Modal
+    const modal = document.getElementById('inspectorModal');
+    if (modal) {
+        if (isInspecting) {
+            modal.classList.remove('hidden');
+            updateInspectorContent(); // Load content immediately
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
 }
 
 function toggleObserve() {
@@ -292,7 +302,139 @@ function init() {
     setMutationCallback(showMutationPopup);
 
     // Setup UI Tabs (Inspector)
-    setupInspectorTabs();
+    setupInspectorModal();
+
+    // Setup Debug UI
+    initDebugUI();
+}
+
+function initDebugUI() {
+    if (!GameConfig.debugMode) return;
+
+    const debugBtn = document.getElementById('debugBtn');
+    const debugTimer = document.getElementById('debugTimer');
+    const menu = document.getElementById('debugMenu');
+    const closeBtn = document.getElementById('closeDebugBtn');
+
+    if (debugBtn) {
+        debugBtn.classList.remove('hidden');
+        debugBtn.style.display = 'block';
+
+        debugBtn.onclick = () => {
+            menu.classList.remove('hidden');
+            menu.style.display = 'flex';
+            updateDebugMutations();
+            if (!isPaused) togglePause();
+        };
+    }
+
+    if (debugTimer) {
+        debugTimer.classList.remove('hidden');
+        debugTimer.style.display = 'flex';
+    }
+
+    if (closeBtn && menu) {
+        closeBtn.onclick = () => {
+            menu.classList.add('hidden');
+            menu.style.display = 'none';
+            if (isPaused) togglePause();
+        };
+    }
+
+    // God Mode Checkbox
+    const debugControls = document.querySelector('.debug-controls');
+    // Check if God Mode checkbox already exists to avoid duplicates
+    if (debugControls && !document.getElementById('godModeCb')) {
+        const godModeLabel = document.createElement('label');
+        godModeLabel.style.display = 'block';
+        godModeLabel.style.marginTop = '10px';
+        godModeLabel.style.color = '#FFD700'; // Gold
+
+        const godModeCb = document.createElement('input');
+        godModeCb.id = 'godModeCb';
+        godModeCb.type = 'checkbox';
+        godModeCb.style.marginRight = '5px';
+        godModeCb.checked = godMode;
+        godModeCb.onchange = (e) => {
+            godMode = e.target.checked;
+            console.log("God Mode:", godMode);
+        };
+
+        godModeLabel.appendChild(godModeCb);
+        godModeLabel.appendChild(document.createTextNode("GOD MODE (Infinite Resources)"));
+        debugControls.appendChild(godModeLabel);
+    }
+
+    // Populate Mutations
+    renderDebugMutations();
+
+    // Window Functions for HTML Buttons
+    window.debugSpawn = function (type) {
+        if (!activeCell) return;
+
+        // Spawn near player
+        const x = activeCell.x + (Math.random() - 0.5) * 200;
+        const y = activeCell.y + (Math.random() - 0.5) * 200;
+
+        if (type === 'glucose' || type === 'amino' || type === 'nucleotide') {
+            spawnSpecificFood(type, x, y);
+            console.log("Spawned " + type);
+        } else if (type === 'bacillus') {
+            // Dynamic import to avoid circular dependency issues if any
+            import('./Bacillus.js').then(m => {
+                const b = new m.Bacillus(x, y);
+                addCellToEnvironment(b);
+            });
+        } else if (type === 'megabacillus') {
+            import('./Bacillus.js').then(m => {
+                const mb = new m.Bacillus(x, y, true);
+                addCellToEnvironment(mb);
+            });
+        }
+        console.log("Debug Spawn:", type);
+    };
+}
+
+function renderDebugMutations() {
+    const list = document.getElementById('debugMutationList');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const mutations = Object.keys(GameConfig.Player.mutationCosts);
+    mutations.forEach(mut => {
+        const label = document.createElement('label');
+        label.style.display = 'block';
+        label.innerText = mut;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.dataset.mutation = mut;
+        checkbox.style.marginRight = '10px';
+
+        if (activeCell && activeCell.genes[mut]) {
+            checkbox.checked = true;
+        }
+
+        checkbox.onchange = (e) => {
+            if (activeCell) {
+                activeCell.genes[mut] = e.target.checked;
+                activeCell.updateMaxGrowth();
+                console.log(`Toggled ${mut}: ${e.target.checked}`);
+            }
+        };
+
+        label.prepend(checkbox);
+        list.appendChild(label);
+    });
+}
+
+function updateDebugMutations() {
+    if (!activeCell) return;
+    const checkboxes = document.querySelectorAll('#debugMutationList input');
+    checkboxes.forEach(cb => {
+        const mut = cb.dataset.mutation;
+        cb.checked = !!activeCell.genes[mut];
+    });
 }
 
 function handleCellSwitch() {
@@ -304,6 +446,11 @@ function handleCellSwitch() {
         const clickedCell = getCellAtPosition(mouseWorldX, mouseWorldY);
 
         if (clickedCell) {
+            // [FIX] Prevent clicking enemies unless in debug mode
+            if (clickedCell.isBacillus && !GameConfig.debugMode) {
+                return;
+            }
+
             // Hvis vi er i OBSERVE mode, så overtag cellen!
             if (isObserverMode || !activeCell) {
                 removeCellFromEnvironment(clickedCell);
@@ -357,7 +504,12 @@ function handleDivision() {
             const mother = activeCell;
 
             // Spawn søster (true = spillerens barn)
-            spawnSisterCell(mother.x, mother.y, mother.genes, true);
+            if (mother.isBacillus) {
+                // [FIX] Spawn Bacillus child if mother is Bacillus/Megabacillus
+                spawnBacillusChild(mother.x, mother.y, mother.isMegabacillus);
+            } else {
+                spawnSisterCell(mother.x, mother.y, mother.genes, true);
+            }
 
             // Reset moderen
             mother.aminoAcids = 0;
@@ -449,175 +601,289 @@ function drawMinimap() {
 }
 
 // --- NY SIDEBAR FUNKTION ---
-// --- INSPECTOR TABS SETUP ---
-function setupInspectorTabs() {
-    const btnTree = document.getElementById('tabBtnTree');
-    const btnMission = document.getElementById('tabBtnMission');
-    const contentTree = document.getElementById('tabContentTree');
-    const contentMission = document.getElementById('tabContentMission');
+// --- NY INSPECTOR MODAL LOGIC ---
 
-    if (!btnTree || !btnMission) return;
+function setupInspectorModal() {
+    const modal = document.getElementById('inspectorModal');
+    const closeBtn = document.getElementById('closeInspectBtn');
+    const tabBtns = document.querySelectorAll('.modal-tab-btn');
+    const tabContents = document.querySelectorAll('.modal-tab-content');
 
-    btnTree.onclick = () => {
-        btnTree.classList.add('active');
-        btnMission.classList.remove('active');
-        contentTree.classList.add('active');
-        contentMission.classList.remove('active');
-    };
+    if (!modal) return;
 
-    btnMission.onclick = () => {
-        btnMission.classList.add('active');
-        btnTree.classList.remove('active');
-        contentMission.classList.add('active');
-        contentTree.classList.remove('active');
-        // Force refresh of mission content? It updates every frame anyway.
-    };
+    // Close Button
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            isInspecting = false;
+            // Unpause if we were paused automatically? 
+            // Better UX: keep paused, let user unpause manually via space/button, 
+            // OR consistent with sidebar: close = unpause?
+            // Let's stick to simple visibility toggle here.
+            modal.classList.add('hidden');
+            togglePause(); // Resume game
+        };
+    }
+
+    // Tabs
+    tabBtns.forEach(btn => {
+        btn.onclick = () => {
+            // Remove active from all
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            // Add active to clicked
+            btn.classList.add('active');
+            const targetId = btn.getAttribute('data-tab');
+            document.getElementById(targetId).classList.add('active');
+
+            // Force refresh content
+            if (activeCell) updateInspectorContent();
+        };
+    });
 }
 
-// --- NY SIDEBAR FUNKTION (TABBED) ---
-function updateInspectorSidebar(cell) {
-    // Opdater DOM elementer (Stats)
-    document.getElementById('inspGen').innerText = generation;
-
-    // Population Counters
-    const playerCount = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
-    const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
-    // (Vi har fjernet pop elementerne fra screen overlay, men hvis de fandtes: check if exist)
-    // Hvis vi vil vise dem i sidebaren, skal vi tilføje dem i HTML. 
-    // HTML koden fik dem ikke med i sidebar-content i denne omgang, men lad os fokusere på Tabs.
+// --- HUD UPDATE FUNCTION ---
+function updateHUD(cell) {
+    // Opdater Gen & Population
+    document.getElementById('hudGen').innerText = generation;
+    const pop = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
+    document.getElementById('hudPop').innerText = pop;
 
     if (cell) {
         // ATP
         const atpPct = (cell.atp / cell.maxAtp) * 100;
-        document.getElementById('inspAtpBar').style.width = atpPct + '%';
-        document.getElementById('inspAtpVal').innerText = `${Math.floor(cell.atp)} / ${cell.maxAtp}`;
+        const atpBar = document.getElementById('hudAtpBar');
+        if (atpBar) atpBar.style.width = atpPct + '%';
+        const atpVal = document.getElementById('hudAtpVal');
+        if (atpVal) atpVal.innerText = `${Math.floor(cell.atp)} / ${cell.maxAtp}`;
 
         // Amino
         const aminoPct = (cell.aminoAcids / cell.maxAminoAcids) * 100;
-        document.getElementById('inspAminoBar').style.width = aminoPct + '%';
-        document.getElementById('inspAminoVal').innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
+        const aminoBar = document.getElementById('hudAminoBar');
+        if (aminoBar) aminoBar.style.width = aminoPct + '%';
+        const aminoVal = document.getElementById('hudAminoVal');
+        if (aminoVal) aminoVal.innerText = `${cell.aminoAcids} / ${cell.maxAminoAcids}`;
 
         // Nucleotides
         const nucleoPct = (cell.nucleotides / cell.maxNucleotides) * 100;
-        document.getElementById('inspNucleoBar').style.width = nucleoPct + '%';
-        document.getElementById('inspNucleoVal').innerText = `${cell.nucleotides} / ${cell.maxNucleotides}`;
-
-        // === TAB 1: EVOLUTION TREE ===
-        const treeRoot = document.getElementById('inspTreeRoot');
-        if (treeRoot && document.getElementById('tabContentTree').classList.contains('active')) {
-            treeRoot.innerHTML = '';
-            const g = cell.genes;
-
-            function createNode(title, unlocked, lockedText = "Låst") {
-                const div = document.createElement('div');
-                div.className = `tree-node ${unlocked ? 'acquired' : 'locked'}`;
-                div.innerHTML = `
-                    <div class="tree-item">
-                        <span>${unlocked ? '✅' : '🔒'} ${title}</span>
-                    </div>
-                 `;
-                return div;
-            }
-
-            function createTier(name) {
-                const div = document.createElement('div');
-                div.className = 'tree-tier-title';
-                div.innerText = name;
-                return div;
-            }
-
-            // TIER 1
-            const t1 = document.createElement('div');
-            t1.appendChild(createTier('TIER 1 (Movement)'));
-            if (g.pili) t1.appendChild(createNode('Type IV Pili', true));
-            else if (g.flagellum) t1.appendChild(createNode('Flagellum', true));
-            else {
-                t1.appendChild(createNode('Ingen Mutation', false, "Vælg Pili eller Flagel (Auto)"));
-            }
-            treeRoot.appendChild(t1);
-
-            // TIER 2
-            const t2 = document.createElement('div');
-            t2.appendChild(createTier('TIER 2 (Abilities)'));
-            // Viser status for begge
-            t2.appendChild(createNode('Toxin (E)', g.toxin));
-            t2.appendChild(createNode('Protease (R)', g.protease));
-            treeRoot.appendChild(t2);
-
-            // TIER 3
-            const t3 = document.createElement('div');
-            t3.appendChild(createTier('TIER 3 (Upgrades)'));
-            if (g.pili) {
-                t3.appendChild(createNode('High-Speed Retraction', g.highSpeedRetraction));
-                t3.appendChild(createNode('Multiplex Pili', g.multiplexPili));
-            }
-            if (g.flagellum) {
-                t3.appendChild(createNode('High-Torque', g.highTorque));
-            }
-            t3.appendChild(createNode('Megacytose', g.megacytosis));
-            treeRoot.appendChild(t3);
-
-            // TIER 4
-            const t4 = document.createElement('div');
-            t4.appendChild(createTier('TIER 4 (Apex)'));
-            t4.appendChild(createNode('Endocytosis', g.endocytosis));
-            treeRoot.appendChild(t4);
-        }
-
-        // === TAB 2: MISSION ===
-        const missionRoot = document.getElementById('inspMissionRoot');
-        if (missionRoot && document.getElementById('tabContentMission').classList.contains('active')) {
-            missionRoot.innerHTML = '';
-            const g = cell.genes;
-
-            function addMission(text, done) {
-                const div = document.createElement('div');
-                div.className = `mission-item ${done ? 'done' : ''}`;
-                div.innerText = text;
-                missionRoot.appendChild(div);
-            }
-
-            // Logic to determine Next Steps
-            const hasMove = g.pili || g.flagellum;
-            const hasT2 = g.toxin && g.protease;
-            const hasSize = g.megacytosis;
-            const hasEndo = g.endocytosis;
-
-            addMission("1. Udvikl Bevægelse (Pili/Flagel)", hasMove);
-
-            if (hasMove) {
-                if (!hasT2) {
-                    addMission("2. Udvikl Toxin (Angreb)", g.toxin);
-                    addMission("3. Udvikl Protease (Spisning)", g.protease);
-                    addMission("   (Du skal have BEGGE for at gå videre)", false);
-                } else {
-                    addMission("2. TIER 2 Fuldendt", true);
-
-                    if (!hasSize) {
-                        addMission("4. Voks dig stor (Megacytose)", false);
-                        addMission("   (Du kan også opgradere din fart nu)", true);
-                    } else {
-                        addMission("4. Voks dig stor", true);
-
-                        if (!hasEndo) {
-                            addMission("5. BLIV APEX PREDATOR (Endocytose)", false);
-                        } else {
-                            addMission("5. APEX PREDATOR OPNÅET!", true);
-                            addMission("   Spis alt. Overtag verden.", false);
-                        }
-                    }
-                }
-            }
-        }
+        const nucleoBar = document.getElementById('hudNucleoBar');
+        if (nucleoBar) nucleoBar.style.width = nucleoPct + '%';
+        const nucleoVal = document.getElementById('hudNucleoVal');
+        if (nucleoVal) nucleoVal.innerText = `${cell.nucleotides} / ${cell.maxNucleotides}`;
 
     } else {
-        // Observe Mode
-        document.getElementById('inspAtpVal').innerText = "-";
-        // ... (clear tabs)
-        const treeRoot = document.getElementById('inspTreeRoot');
-        if (treeRoot) treeRoot.innerHTML = "<div style='padding:10px; color:#888'>Observe Mode<br>Klik på en celle for at overtage styringen.</div>";
+        // Observer Mode / Dead
+        document.getElementById('hudAtpVal').innerText = "-";
+        document.getElementById('hudAminoVal').innerText = "-";
+        document.getElementById('hudNucleoVal').innerText = "-";
+        if (document.getElementById('hudAtpBar')) document.getElementById('hudAtpBar').style.width = '0%';
+        if (document.getElementById('hudAminoBar')) document.getElementById('hudAminoBar').style.width = '0%';
+        if (document.getElementById('hudNucleoBar')) document.getElementById('hudNucleoBar').style.width = '0%';
     }
 }
+
+function updateInspectorContent() {
+    if (!activeCell) return; // Kan ikke inspicere null
+
+    // Determine active tab
+    const activeTabContent = document.querySelector('.modal-tab-content.active');
+    if (!activeTabContent) return;
+    const tabId = activeTabContent.id;
+
+    if (tabId === 'tabMutations') {
+        renderMutationTab();
+    } else if (tabId === 'tabMetabolism') {
+        renderMetabolismTab();
+    } else if (tabId === 'tabCells') {
+        renderCellsTab();
+    }
+}
+
+function renderMutationTab() {
+    const container = document.getElementById('mutationTreeContainer');
+    if (!container) return;
+    container.innerHTML = ''; // Clear
+
+    const g = activeCell.genes;
+
+    // Helper to create nodes
+    function createNode(title, unlocked, customClass = '') {
+        const div = document.createElement('div');
+        div.className = `tree-node ${unlocked ? 'acquired' : 'locked'} ${customClass}`;
+        div.innerHTML = `
+            <div class="tree-item">
+                <span>${unlocked ? '✅' : '🔒'} ${title}</span>
+            </div>`;
+        return div;
+    }
+
+    function createTier(name) {
+        const div = document.createElement('div');
+        div.className = 'tree-tier-title';
+        div.innerText = name;
+        div.style.marginTop = '15px';
+        return div;
+    }
+
+    // LISTE OVER ALLE MULIGE MUTATIONER (Hardcoded hierarchy visual)
+
+    // TIER 1
+    container.appendChild(createTier('TIER 1 (Movement)'));
+    container.appendChild(createNode('Flagellum (Hale)', g.flagellum));
+    container.appendChild(createNode('Type IV Pili (Gribekroge)', g.pili));
+
+    // TIER 2
+    container.appendChild(createTier('TIER 2 (Abilities)'));
+    container.appendChild(createNode('Toxin (Giftudskillelse) [E]', g.toxin));
+    container.appendChild(createNode('Protease (Lig-spisning) [R]', g.protease));
+    container.appendChild(createNode('Gram Positiv (Cellevæg forvar)', g.gramPositive));
+
+    // TIER 3
+    container.appendChild(createTier('TIER 3 (Specialization)'));
+    // Conditional display or just list all? Listing all shows potential.
+    container.appendChild(createNode('High-Torque Flagel (Super Fart)', g.highTorque));
+    container.appendChild(createNode('High-Speed Retraction (Hurtig Pili)', g.highSpeedRetraction));
+    container.appendChild(createNode('Multiplex Pili (Flere Pili)', g.multiplexPili));
+    container.appendChild(createNode('Megacytose (Kæmpe Vækst)', g.megacytosis));
+
+    // TIER 4
+    container.appendChild(createTier('TIER 4 (Apex Predator)'));
+    container.appendChild(createNode('Endocytose (Spis levende celler)', g.endocytosis));
+}
+
+function renderMetabolismTab() {
+    const container = document.getElementById('metabolismContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Lige nu er det statisk for vores simple celle, men struktur til fremtid
+    const pathways = [
+        { name: "Glykolyse", type: "Catabolic", desc: "Nedbryder glukose til pyruvat. Giver lidt ATP.", active: true },
+        { name: "Mælkesyrefermentering", type: "Fermentation", desc: "Omdanner pyruvat til laktat for at genbruge NAD+. Ingen ilt kræves.", active: true },
+        // Placeholder for future stuff
+        { name: "Respiration (Aerob)", type: "Respiration", desc: "Kræver ilt. Giver MEGET ATP. (Ikke udviklet)", active: false },
+        { name: "Fotosyntese", type: "Anabolic", desc: "Bruger lys til at lave sukker. (Ikke udviklet)", active: false }
+    ];
+
+    pathways.forEach(p => {
+        const div = document.createElement('div');
+        div.style.padding = "10px";
+        div.style.marginBottom = "10px";
+        div.style.background = p.active ? "rgba(105, 240, 174, 0.1)" : "rgba(255, 255, 255, 0.05)";
+        div.style.borderLeft = p.active ? "3px solid #69F0AE" : "3px solid #555";
+        div.style.opacity = p.active ? "1" : "0.5";
+
+        div.innerHTML = `
+            <h4 style="margin: 0 0 5px 0; color: ${p.active ? '#69F0AE' : '#888'}">${p.name}</h4>
+            <p style="margin:0; font-size:12px; color: #ccc">${p.desc}</p>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function renderCellsTab() {
+    const container = document.getElementById('cellListContainer');
+    if (!container) return;
+    container.innerHTML = '<h3>Tilgængelige Celler</h3>';
+
+    // Find kandidater (Ikke Bacillus, Levende, Ikke aktiv spiller)
+    const candidates = otherCells.filter(c => !c.isBacillus && c.alive && c !== activeCell);
+
+    if (candidates.length === 0) {
+        container.innerHTML += '<p style="color:#888;">Ingen andre overtagelige celler i nærheden.</p>';
+        return;
+    }
+
+    candidates.forEach((cell, index) => {
+        const item = document.createElement('div');
+        item.className = 'cell-list-item';
+
+        // Preview (Color dot)
+        // Check for dominant gene for color/icon?
+        let icon = "🦠";
+        if (cell.genes.flagellum) icon = "🚩";
+        else if (cell.genes.pili) icon = "🤏";
+
+        // Info
+        const info = document.createElement('div');
+        info.className = 'cell-info';
+        info.innerHTML = `
+            <h4>Celle #${index + 1}</h4>
+            <p>ATP: ${Math.floor(cell.atp)} | Amino: ${cell.aminoAcids}</p>
+        `;
+
+        // Actions
+        const actions = document.createElement('div');
+        actions.className = 'cell-actions';
+
+        // TAKE OVER
+        const btnTake = document.createElement('button');
+        btnTake.className = 'action-btn';
+        btnTake.innerText = "Overtag";
+        btnTake.onclick = () => {
+            // Switch Logic (reused from handleCellSwitch logic somewhat)
+            const oldPlayer = activeCell;
+            addCellToEnvironment(oldPlayer);
+            removeCellFromEnvironment(cell); // Fjern fra otherCells
+            setActiveCell(cell);
+
+            // Overfør callback
+            cell.onAction = oldPlayer.onAction;
+            oldPlayer.onAction = null;
+
+            // Close modal & Resume
+            document.getElementById('inspectorModal').classList.add('hidden');
+            isInspecting = false;
+            isPaused = false;
+            document.getElementById('pauseBtn').innerText = "⏸ PAUSE";
+
+            console.log("Switched to cell via Inspector");
+        };
+
+        // DNA BUTTON
+        const btnDna = document.createElement('button');
+        btnDna.className = 'action-btn secondary';
+        btnDna.innerText = "🧬";
+        btnDna.title = "Vis Gener";
+
+        // Container for DNA detail (hidden by default)
+        const dnaDetail = document.createElement('div');
+        dnaDetail.className = 'dna-details hidden';
+        dnaDetail.style.display = 'none';
+
+        btnDna.onclick = () => {
+            if (dnaDetail.style.display === 'none') {
+                dnaDetail.style.display = 'block';
+                // Build gene string
+                const g = cell.genes;
+                const traits = [];
+                if (g.flagellum) traits.push("Flagellum");
+                if (g.pili) traits.push("Pili");
+                if (g.toxin) traits.push("Toxin");
+                if (g.protease) traits.push("Protease");
+                if (g.megacytosis) traits.push("Megacytosis");
+                // ... add others
+                dnaDetail.innerText = traits.length > 0 ? traits.join(", ") : "Ingen mutationer";
+            } else {
+                dnaDetail.style.display = 'none';
+            }
+        };
+
+        actions.appendChild(btnTake);
+        actions.appendChild(btnDna);
+
+        item.appendChild(info);
+        item.appendChild(actions);
+
+        // Wrap item + details
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(item);
+        wrapper.appendChild(dnaDetail);
+
+        container.appendChild(wrapper);
+    });
+}
+
 
 // Opdater UI (Kun de elementer der ikke er i sidebar - dvs. knapper/overlays hvis nødvendigt)
 function updateUI() {
@@ -674,8 +940,7 @@ function updateCamera() {
         let targetX = activeCell.x - canvas.width / 2;
         let targetY = activeCell.y - canvas.height / 2;
 
-        // "Look Ahead" prediction removed: It caused sudden jerky jumps when state switched.
-        // Instead, rely on a very lazy camera to absorb the twitch movement.
+
 
         // Smooth Camera (LERP)
         // 0.05 = Meget blød og tungt kamera. Glider roligt efter cellen.
@@ -744,6 +1009,23 @@ function gameLoop() {
         otherCells.forEach(cell => checkCollisions(cell));
         // Opdater miljøet (mad spawning, partikler)
         updateEnvironment(worldWidth, worldHeight, activeCell);
+
+        // --- GOD MODE ---
+        if (godMode && activeCell) {
+            activeCell.atp = activeCell.maxAtp;
+            activeCell.aminoAcids = activeCell.maxAminoAcids;
+            activeCell.nucleotides = activeCell.maxNucleotides;
+        }
+
+        // --- DEBUG TIMER UPDATE ---
+        if (GameConfig.debugMode) {
+            const elapsed = Date.now() - gameStartTime;
+            const mins = Math.floor(elapsed / 60000);
+            const secs = Math.floor((elapsed % 60000) / 1000);
+            const timerStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            const timerEl = document.getElementById('debugTimer');
+            if (timerEl) timerEl.innerText = timerStr;
+        }
     }
 
     // 2. Tegning - Verden (Med Kamera Transform)
@@ -764,7 +1046,10 @@ function gameLoop() {
     drawUI();
 
     // Sidebaren opdateres hver frame (altid aktiv nu) (Send activeCell eller null)
-    updateInspectorSidebar(activeCell);
+
+
+    // Sidebaren/HUD opdateres hver frame (altid aktiv nu) (Send activeCell eller null)
+    updateHUD(activeCell);
 
     requestAnimationFrame(gameLoop);
 }

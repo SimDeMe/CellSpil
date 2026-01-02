@@ -140,6 +140,7 @@ export class Cell {
         }
 
         this.age++;
+        this.isTakingDamage = false; // [NEW] Reset damage flag for this frame
 
         // --- ENDOCYTOSIS ANIMATION ---
         if (this.engulfed) {
