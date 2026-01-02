@@ -71,6 +71,8 @@ export class Cell {
 
         this.size = 1; // Default size tier
 
+        this.currentSpeed = 0; // [NEW] Track speed for animation
+
         // --- PILI (Twitch Motility) STATE ---
         this.piliState = 'idle'; // 'idle', 'extending', 'retracting'
         this.piliLength = 0;
@@ -305,6 +307,7 @@ export class Cell {
                 if (speedFactor > 1) speedFactor = 1;
 
                 const totalSpeed = moveSpeed * speedFactor;
+                this.currentSpeed = totalSpeed; // Capture actual speed
                 this.x += (dx / distance) * totalSpeed;
                 this.y += (dy / distance) * totalSpeed;
 
@@ -320,6 +323,7 @@ export class Cell {
                 if (this.piliState === 'retracting') {
                     const moveX = Math.cos(this.piliTargetAngle) * piliMoveSpeed;
                     const moveY = Math.sin(this.piliTargetAngle) * piliMoveSpeed;
+                    this.currentSpeed = piliMoveSpeed;
                     this.x += moveX;
                     this.y += moveY;
 
@@ -336,6 +340,7 @@ export class Cell {
             // ...
             this.moveAngle += (Math.random() - 0.5) * 0.1;
             const npcSpeed = moveSpeed * 0.5;
+            this.currentSpeed = npcSpeed;
             this.x += Math.cos(this.moveAngle) * npcSpeed;
             this.y += Math.sin(this.moveAngle) * npcSpeed;
             this.atp -= 0.01;

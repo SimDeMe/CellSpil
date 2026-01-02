@@ -789,6 +789,14 @@ export function renderEnvironment(activeCell) {
     const allCells = [...otherCells];
     if (activeCell) allCells.push(activeCell);
 
+    // Update animation phases
+    allCells.forEach(cell => {
+        // Base freq 0.2 + speed factor
+        const speed = cell.currentSpeed || 0;
+        const freq = 0.2 + speed * 0.2;
+        cell._wavePhase = (cell._wavePhase || 0) + freq;
+    });
+
     syncLayer(allCells, cellLayer, drawCell);
 }
 
@@ -868,37 +876,59 @@ function drawCell(g, cell, initial) {
     const pulse = cell.pulse || 0;
     const r = (cell.radius || 20) + Math.sin(pulse) * 2;
 
-    // 1. Shape
-    g.circle(0, 0, r);
-
-    // 2. Fill
+    // Determine colors first
     let fillColor = cell.color || '#888';
     if (cell.alive && cell.aminoAcids >= cell.maxAminoAcids) {
         fillColor = cell.isPlayer ? '#69F0AE' : '#FFF59D';
     }
-    g.fill(fillColor);
 
-    // 3. Stroke
-    g.stroke({ width: 3, color: cell.isPlayer ? '#81C784' : (cell.isBacillus ? '#FDD835' : '#666') });
-
-    // Extras (Flagellum)
+    // 1. Extras (Flagellum) - DRAWN FIRST (BEHIND)
     if (cell.genes && cell.genes.flagellum && cell.alive) {
-        const tailLen = r * 1.5;
+        const tailLen = r * 2.5; // Longer tail
         const dir = (cell.isPlayer ? (cell.angle || 0) : (cell.moveAngle || 0)) + Math.PI;
 
-        // Start new path for tail
-        g.beginPath(); // Optional in v8 if moving?
-        g.moveTo(Math.cos(dir) * r, Math.sin(dir) * r);
+        // Sine Wave Tail
+        const segments = 10;
+        const step = tailLen / segments;
+        const phase = cell._wavePhase || 0;
 
-        const tipX = Math.cos(dir) * (r + tailLen);
-        const tipY = Math.sin(dir) * (r + tailLen);
+        // Perpendicular vector for wave amplitude
+        const perpX = Math.cos(dir + Math.PI / 2);
+        const perpY = Math.sin(dir + Math.PI / 2);
 
-        // Simple curve
-        const wave = Math.sin(Date.now() / 100) * 5;
-        const midX = Math.cos(dir) * (r + tailLen / 2) + Math.cos(dir + Math.PI / 2) * wave;
-        const midY = Math.sin(dir) * (r + tailLen / 2) + Math.sin(dir + Math.PI / 2) * wave;
+        // Direction vector
+        const dirX = Math.cos(dir);
+        const dirY = Math.sin(dir);
 
-        g.quadraticCurveTo(midX, midY, tipX, tipY);
+        g.beginPath();
+        // Start at edge of cell
+        g.moveTo(dirX * r, dirY * r);
+
+        for (let i = 1; i <= segments; i++) {
+            const dist = i * step;
+            // Tapering amplitude: grows then shrinks slightly? Or just constant?
+            // Real flagella are constant helix, projected looks like constant sine.
+            const amplitude = 5;
+
+            // Wave function: sin(k*x - w*t)
+            const wave = Math.sin(i * 0.8 - phase) * amplitude;
+
+            const px = (dirX * (r + dist)) + (perpX * wave);
+            const py = (dirY * (r + dist)) + (perpY * wave);
+
+            g.lineTo(px, py);
+        }
+
         g.stroke({ width: 2, color: fillColor });
     }
+
+    // 2. Body Shape (Circle) - DRAWN ON TOP
+    g.beginPath();
+    g.circle(0, 0, r);
+
+    // 3. Fill
+    g.fill(fillColor);
+
+    // 4. Stroke
+    g.stroke({ width: 3, color: cell.isPlayer ? '#81C784' : (cell.isBacillus ? '#FDD835' : '#666') });
 }
