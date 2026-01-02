@@ -1,3 +1,4 @@
+
 import { Cell } from './Cell.js';
 import { Bacillus } from './Bacillus.js';
 import { GameConfig } from './GameConfig.js';
@@ -14,17 +15,74 @@ let spawnTimer = 0;
 let onMutationCallback = null;
 
 export function setMutationCallback(callback) {
-    onMutationCallback = callback;
+    // Placeholder to ensure I view the file before modifying logic loops.
 }
 
-export function initEnvironment(canvasWidth, canvasHeight) {
+// Helper for Pixi Sync
+function syncParticles(list, layer, drawFn) {
+    for (let i = list.length - 1; i >= 0; i--) {
+        const p = list[i];
+        if (!p.graphic) {
+            p.graphic = new PIXI.Graphics();
+            drawFn(p.graphic, p);
+            layer.addChild(p.graphic);
+        }
+        p.graphic.x = p.x;
+        p.graphic.y = p.y;
+    }
+}
+
+// --- PIXI CONTAINERS ---
+export let worldContainer;
+let foodLayer, toxinLayer, zoneLayer, cellLayer, dangerZoneLayer;
+let appInstance; // Ref to pixi app if needed
+
+export function initEnvironment(app) {
+    appInstance = app;
+
+    // Create World Container (Camera pivot)
+    worldContainer = new PIXI.Container();
+    app.stage.addChild(worldContainer);
+
+    // [NEW] Background / World Boundary
+    const bg = new PIXI.Graphics();
+    bg.rect(0, 0, GameConfig.World.width, GameConfig.World.height);
+    bg.fill({ color: 0x111111 }); // Very dark grey, visible against black space
+    bg.stroke({ width: 2, color: 0x444444 });
+    worldContainer.addChild(bg);
+
+    // Create Layers (Order matters!)
+    zoneLayer = new PIXI.Container();
+    foodLayer = new PIXI.Container();
+    toxinLayer = new PIXI.Container();
+    cellLayer = new PIXI.Container(); // Enemies & Player
+
+    worldContainer.addChild(zoneLayer);
+    worldContainer.addChild(foodLayer);
+    worldContainer.addChild(toxinLayer);
+    worldContainer.addChild(cellLayer);
+
+    // Init Logic
     foodParticles.length = 0;
     otherCells.length = 0;
+    dangerZones.length = 0;
 
-    // Spawn Mad
+    // Spawn Initial Food
     for (let i = 0; i < 500; i++) {
-        spawnFood(canvasWidth, canvasHeight);
+        spawnFood(app.screen.width, app.screen.height);
     }
+
+    // Expose Camera Helper
+    window.setCameraPosition = (x, y) => {
+        worldContainer.position.set(x, y);
+    }
+}
+
+export function spawnBacillus(canvasWidth, canvasHeight) {
+    const x = Math.random() * canvasWidth;
+    const y = Math.random() * canvasHeight;
+    const bac = new Bacillus(x, y);
+    otherCells.push(bac);
 }
 
 export function triggerInvasion(canvasWidth, canvasHeight) {
@@ -37,9 +95,23 @@ export function triggerInvasion(canvasWidth, canvasHeight) {
     }
 }
 
+export function spawnMegabacillus(canvasWidth, canvasHeight) {
+    const count = GameConfig.Megabacillus.count;
+    for (let i = 0; i < count; i++) {
+        const x = Math.random() * canvasWidth;
+        const y = Math.random() * canvasHeight;
+        const mega = new Bacillus(x, y, true); // true = Megabacillus
+        otherCells.push(mega);
+    }
+    console.log("WARNING: Megabacillus Spawned!");
+}
+
 // Toxin System
 export const toxinParticles = [];
 export const proteaseParticles = [];
+export const dangerZones = []; // [NEW] Environmental Hazards
+let dangerZoneSpawnTimer = 0;
+let nextZoneSpawnTime = 600; // Start fast for debug/first spawn
 
 export function spawnToxinPulse(x, y) {
     // Spawn 20 partikler i en cirkel
@@ -96,8 +168,17 @@ function updateToxinParticles(canvasWidth, canvasHeight) {
             if (dist < cell.radius) {
                 // Skade!
                 if (!cell.isPlayer) {
-                    cell.alive = false;
-                    console.log("Celle dræbt af toxin!");
+                    // [NEW] Gram Positive (Defense)
+                    if (cell.genes && cell.genes.gramPositive) {
+                        // Immune to toxin!
+                    } else {
+                        cell.alive = false;
+                        if (cell.isMegabacillus) {
+                            console.log("Megabacillus dræbt af toxin!");
+                        } else {
+                            console.log("Celle dræbt af toxin!");
+                        }
+                    }
                 }
 
                 toxinParticles.splice(i, 1); // Partikel brugt
@@ -148,6 +229,81 @@ function updateProteaseParticles(canvasWidth, canvasHeight) {
     }
 }
 
+function updateDangerZones(width, height) {
+    // 1. Spawning
+    dangerZoneSpawnTimer++;
+    if (dangerZoneSpawnTimer > nextZoneSpawnTime) {
+        dangerZoneSpawnTimer = 0;
+        nextZoneSpawnTime = GameConfig.DangerZones.spawnIntervalMin + Math.random() * (GameConfig.DangerZones.spawnIntervalMax - GameConfig.DangerZones.spawnIntervalMin);
+
+        // Spawn
+        const type = Math.random() > 0.5 ? 'toxin' : 'antibiotic';
+        dangerZones.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            radius: 0,
+            state: 'growing', // growing, stable, shrinking
+            timer: 0,
+            type: type,
+            maxRadius: GameConfig.DangerZones.maxRadius * (0.5 + Math.random() * 0.5) // Varieret størrelse
+        });
+        console.log(`Spawned Danger Zone: ${type} `);
+    }
+
+    // 2. Updates & Collisions
+    for (let i = dangerZones.length - 1; i >= 0; i--) {
+        const zone = dangerZones[i];
+
+        // Lifecycle
+        if (zone.state === 'growing') {
+            zone.radius += GameConfig.DangerZones.growthSpeed;
+            if (zone.radius >= zone.maxRadius) {
+                zone.radius = zone.maxRadius;
+                zone.state = 'stable';
+                zone.timer = GameConfig.DangerZones.duration;
+            }
+        } else if (zone.state === 'stable') {
+            zone.timer--;
+            if (zone.timer <= 0) {
+                zone.state = 'shrinking';
+            }
+        } else if (zone.state === 'shrinking') {
+            zone.radius -= GameConfig.DangerZones.growthSpeed;
+            if (zone.radius <= 0) {
+                dangerZones.splice(i, 1);
+                continue;
+            }
+        }
+
+        // Collisions / Damage
+        // Check ALL cells (Player + NPCs)
+        // We need access to 'otherCells' (global here) AND 'activeCell' (passed to updateEnvironment)
+        // Let's make a helper or just iterate here.
+        // We will do it in 'checkAllZoneCollisions' called below, or inline here.
+        // Inline here is efficient since we have the zone loop.
+    }
+}
+
+function checkZoneDamage(cell, zone) {
+    if (!cell.alive) return;
+
+    const dx = cell.x - zone.x;
+    const dy = cell.y - zone.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < zone.radius) {
+        // HIT! Check Immunity (Gram Positive protects against BOTH)
+        if (cell.genes && cell.genes.gramPositive) {
+            return; // Immune
+        }
+
+        // Apply Damage
+        const dmg = GameConfig.DangerZones.damageRate;
+        cell.atp -= dmg;
+        cell.aminoAcids -= dmg;
+        cell.isTakingDamage = true; // For visual blink
+    }
+}
 
 export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     spawnTimer++;
@@ -158,6 +314,30 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
 
     updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
     updateProteaseParticles(canvasWidth, canvasHeight); // Protease Update
+    updateDangerZones(canvasWidth, canvasHeight); // [NEW]
+
+    // Collision Check for Zones (Separate loop to be clean or inside updateDangerZones?)
+    // Inside updateDangerZones we only iterated zones. checking collisions there means N_zones * N_cells.
+    // Let's do it there.
+    dangerZones.forEach(z => {
+        if (activeCell) checkZoneDamage(activeCell, z);
+        otherCells.forEach(c => checkZoneDamage(c, z));
+    });
+
+    // --- MEGABACILLUS SPAWN CHECK ---
+    if (!triggerInvasion.megaSpawned && GameConfig.Megabacillus) {
+        // Use a static property or global to track if spawned? 
+        // Better: triggerInvasion is a function, we can hang a prop on it or use a separate flag.
+        // Let's use a module-level variable defined above.
+    }
+
+    // Check Timer
+    // Environment doesn't track game time directly, main.js does.
+    // However, updateEnvironment is called every frame.
+    // Let's handle spawning in main.js where gameStartTime is, OR pass time delta here.
+    // Actually, Environment.js has 'spawnTimer' for food, so it has frame counting.
+    // But 'gameStartTime' is in main.js.
+    // Let's add a `spawnMegabacillus` function and call it from main.js when time matches.
 
     if (activeCell) {
         resolveCollisions(activeCell, otherCells);
@@ -241,7 +421,8 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
 
         // Her opdaterer vi NPC'erne (Bacillus og andre)
         // Send foodParticles med så Bacillus kan finde mad, og otherCells for separation
-        cell.update(null, null, canvasWidth, canvasHeight, foodParticles, otherCells);
+        // [NEW] Send activeCell med så Megabacillus kan jage spilleren
+        cell.update(null, null, canvasWidth, canvasHeight, foodParticles, otherCells, activeCell);
 
         // Division Logic
         if (cell.alive) {
@@ -275,6 +456,14 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     }
 }
 
+export function spawnBacillusChild(x, y, isMega) {
+    // [NEW] Helper for possessed Bacillus division
+    const child = new Bacillus(x, y, isMega);
+    // Inherit stats? Bacillus stats are fixed by type usually, maybe genes?
+    // For now, new fresh Bacillus is fine.
+    otherCells.push(child);
+}
+
 export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false) {
     const sister = new Cell(x, y, false);
     sister.radius = 20;
@@ -283,6 +472,7 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
     if (motherGenes) {
         sister.genes = { ...motherGenes };
     }
+
 
     // Mutation: 40% chance for en ny mutation (FREMADRETTET)
     let mutated = false;
@@ -297,11 +487,12 @@ export function spawnSisterCell(x, y, motherGenes = null, isPlayerChild = false)
         if (!g.pili && !g.flagellum) {
             possibleMutations.push('pili', 'flagellum');
         }
-        else if (!g.toxin || !g.protease) {
-            // TIER 2: Toxin AND Protease - Exclusive Access
+        else if (!g.toxin || !g.protease || !g.gramPositive) {
+            // TIER 2: Toxin AND Protease AND Gram Positive - Exclusive Access
             // Spilleren skal udvikle disse EVNER før de kan opgradere dem
             if (!g.toxin) possibleMutations.push('toxin');
             if (!g.protease) possibleMutations.push('protease');
+            if (!g.gramPositive) possibleMutations.push('gramPositive');
         }
         else {
             // TIER 3: Movement Upgrades & Size Upgrades
@@ -380,7 +571,21 @@ export function addCellToEnvironment(cellToAdd) {
     otherCells.push(cellToAdd);
 }
 
-function spawnFood(width, height) {
+export function spawnSpecificFood(type, x, y) {
+    const particle = {
+        x: x,
+        y: y,
+        type: type, // 'glucose', 'amino', 'nucleotide'
+        radius: (type === 'glucose') ? 3 : 4,
+        color: (type === 'glucose') ? '#FFEB3B' : (type === 'amino' ? '#2196F3' : '#F44336'),
+        driftAngle: Math.random() * Math.PI * 2,
+        vx: 0,
+        vy: 0
+    };
+    foodParticles.push(particle);
+}
+
+export function spawnFood(width, height) {
     const typeRandom = Math.random();
     let particle = {
         x: Math.random() * width,
@@ -407,6 +612,18 @@ function spawnFood(width, height) {
 }
 
 export function drawEnvironment(ctx) {
+    // [NEW] Draw Danger Zones first (Background)
+    dangerZones.forEach(zone => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+        ctx.fillStyle = GameConfig.DangerZones.colors[zone.type] || 'rgba(0,0,0,0.1)';
+        ctx.fill();
+        // Soft edge? Radial gradient would be nice but expensive. keeping simple for now.
+        ctx.restore();
+    });
+
+    // Draw Food
     foodParticles.forEach(food => {
         ctx.beginPath();
         if (food.type === 'glucose') {
@@ -546,5 +763,155 @@ export function resolveCollisions(player, others) {
                 }
             }
         }
+    }
+}
+
+// --- VISUAL RENDERING (PIXI) ---
+let renderFrameId = 0;
+
+export function renderEnvironment(activeCell) {
+    renderFrameId++;
+
+    // 1. Sync Layers
+    syncLayer(dangerZones, worldContainer.children[0], drawDangerZone); // ZoneLayer is 0
+    // Wait, accessing worldContainer.children by index is risky if order changes.
+    // Better to export layers or expose them? 
+    // `initEnvironment` creates them local variables.
+    // I should update `initEnvironment` to export them, or just use `worldContainer.children` if I know the order.
+    // Order was: zone, food, toxin, cell.
+    // 0: Zone, 1: Food, 2: Toxin, 3: Cell (activeCell + others)
+
+    // BUT, wait. Accessing local vars `foodLayer` etc from `initEnvironment` scope?
+    // They are defined at module level (lines 36).
+    // So I can access them directly!
+    // 'let foodLayer, toxinLayer...' are at line 36.
+
+    // HOWEVER, I cannot easily see them in the snippet above (lines 770+).
+    // I recall viewing the file earlier and they were at top.
+    // Yes, Step 205 showed they are module scope:
+    // 36: let foodLayer, toxinLayer, zoneLayer, cellLayer, dangerZoneLayer;
+
+    // So I can just use them.
+
+    syncLayer(dangerZones, zoneLayer, drawDangerZone);
+    syncLayer(foodParticles, foodLayer, drawFood);
+    syncLayer(toxinParticles, toxinLayer, drawToxin);
+    syncLayer(proteaseParticles, toxinLayer, drawProtease);
+
+    // Cells (Player + NPCs)
+    const allCells = [...otherCells];
+    if (activeCell) allCells.push(activeCell);
+
+    syncLayer(allCells, cellLayer, drawCell);
+}
+
+function syncLayer(dataList, layer, drawFunc) {
+    if (!layer) return; // Safety
+
+    // 1. Mark & Update/Create
+    for (let i = 0; i < dataList.length; i++) {
+        const item = dataList[i];
+        item._renderFrame = renderFrameId;
+
+        if (!item.graphic) {
+            item.graphic = new PIXI.Graphics();
+            item.graphic.dataObject = item; // Link back
+            layer.addChild(item.graphic);
+            // Initial Draw
+            drawFunc(item.graphic, item, true);
+        } else {
+            // Update Draw (Optimized: Only redraw if needed? For now redraw dynamic stuff)
+            drawFunc(item.graphic, item, false);
+        }
+
+        // Position Update
+        item.graphic.x = item.x;
+        item.graphic.y = item.y;
+        item.graphic.rotation = item.angle || item.moveAngle || 0;
+    }
+
+    // 2. Sweep (Remove unused graphics)
+    for (let i = layer.children.length - 1; i >= 0; i--) {
+        const child = layer.children[i];
+        if (child.dataObject && child.dataObject._renderFrame !== renderFrameId) {
+            child.destroy({ children: true });
+        }
+    }
+}
+
+// --- DRAW FUNCTIONS ---
+
+function drawFood(g, p, initial) {
+    if (initial) {
+        g.clear();
+        g.beginPath();
+        if (p.type === 'glucose') {
+            g.circle(0, 0, p.radius);
+        } else {
+            g.rect(-p.radius, -p.radius, p.radius * 2, p.radius * 2);
+        }
+        g.fill(p.color);
+    }
+}
+
+function drawToxin(g, p, initial) {
+    g.clear();
+    g.alpha = p.life / p.maxLife;
+    g.circle(0, 0, 4);
+    g.fill('#00E676');
+}
+
+function drawProtease(g, p, initial) {
+    g.clear();
+    g.alpha = p.life / p.maxLife;
+    g.circle(0, 0, 3);
+    g.fill('#E91E63');
+}
+
+function drawDangerZone(g, z, initial) {
+    g.clear();
+    g.circle(0, 0, z.radius);
+    g.fill(GameConfig.DangerZones.colors[z.type] || 'rgba(0,0,0,0.1)');
+}
+
+function drawCell(g, cell, initial) {
+    g.clear();
+
+    // Make sure pulse exists
+    const pulse = cell.pulse || 0;
+    const r = (cell.radius || 20) + Math.sin(pulse) * 2;
+
+    // 1. Shape
+    g.circle(0, 0, r);
+
+    // 2. Fill
+    let fillColor = cell.color || '#888';
+    if (cell.alive && cell.aminoAcids >= cell.maxAminoAcids) {
+        fillColor = cell.isPlayer ? '#69F0AE' : '#FFF59D';
+    }
+    g.fill(fillColor);
+
+    // 3. Stroke
+    g.stroke({ width: 3, color: cell.isPlayer ? '#81C784' : (cell.isBacillus ? '#FDD835' : '#666') });
+
+    // Extras (Flagellum)
+    if (cell.genes && cell.genes.flagellum && cell.alive) {
+        const tailLen = r * 1.5;
+        const dir = (cell.isPlayer ? (cell.angle || 0) : (cell.moveAngle || 0)) + Math.PI;
+
+        // Start new path for tail
+        g.beginPath(); // Optional in v8 if moving?
+        g.moveTo(Math.cos(dir) * r, Math.sin(dir) * r);
+
+        const tipX = Math.cos(dir) * (r + tailLen);
+        const tipY = Math.sin(dir) * (r + tailLen);
+
+        // Simple curve
+        const wave = Math.sin(Date.now() / 100) * 5;
+        const midX = Math.cos(dir) * (r + tailLen / 2) + Math.cos(dir + Math.PI / 2) * wave;
+        const midY = Math.sin(dir) * (r + tailLen / 2) + Math.sin(dir + Math.PI / 2) * wave;
+
+        g.quadraticCurveTo(midX, midY, tipX, tipY);
+        g.stroke({ width: 2, color: fillColor });
     }
 }
