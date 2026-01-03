@@ -336,6 +336,13 @@ export class Cell {
         this.x += (Math.random() - 0.5) * 0.5;
         this.y += (Math.random() - 0.5) * 0.5;
 
+        // Dynamic Collision Radius (Match visual stretch)
+        // Snail stretches forward based on speed. We expand hit circle to cover the snout.
+        const baseR = this.morphology.radius;
+        const speedFactor = Math.min(this.currentSpeed / 2.0, 1.5);
+        const stretch = speedFactor * 10;
+        this.radius = baseR + stretch; // Use full stretch for generous collision
+
         if (this.x - this.radius < 0) this.x = this.radius;
         else if (this.x + this.radius > worldWidth) this.x = worldWidth - this.radius;
         if (this.y - this.radius < 0) this.y = this.radius;
