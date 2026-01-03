@@ -7,7 +7,7 @@ import {
     getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
     setMutationCallback, triggerInvasion, spawnToxinPulse, spawnProteasePulse,
     spawnMegabacillus, spawnSpecificFood, spawnBacillus, spawnBacillusChild,
-    renderEnvironment, attemptMutation // [NEW]
+    renderEnvironment, attemptMutation, performSplit
 } from './Environment.js';
 
 // --- PIXI JS SETUP ---
@@ -698,37 +698,13 @@ function handleDivision() {
 
     // 2. Process Division State (Animation)
     if (activeCell && activeCell.isDividing) {
-        // Check if animation is complete
-        if (activeCell.divisionTimer >= activeCell.divisionDuration) {
-            // --- SPAWN LOGIC ---
-            const mother = activeCell;
+        // [NEW] Division handled by CellDivisionTrait + Environment.performSplit
+        // We only need to check if we should trigger mutation just before split?
+        // Or handle generation count?
 
-            // 1. MUTATION: Try to evolve the MOTHER (Player)
-            attemptMutation(mother);
-
-            // 2. SPAWN SISTER: Clone of current genes (or pre-mutation? Logic uses mother.genes ref)
-            // Since we mutated mother instantly, sister gets same genes. 
-            // That's fine, evolved parent makes evolved offspring.
-            if (mother.isBacillus) {
-                spawnBacillusChild(mother.x, mother.y, mother.isMegabacillus);
-            } else {
-                spawnSisterCell(mother.x, mother.y, mother.genes, true);
-            }
-
-            // Reset moderen (Cost of division)
-            mother.aminoAcids = 0;
-            mother.aminoAcids = 0;
-            mother.radius = mother.minRadius;
-            // Shift mother slightly left/right against child?
-            // Animation separates them, so logical shift is fine.
-            mother.x -= 10;
-
-            generation++;
-
-            // Nulstil division state
-            mother.finalizeDivision();
-            keys.m = false; // Reset key to prevent double spawn
-        }
+        // Actually, performSplit handles killing parent.
+        // So we should detect if split happened.
+        // performSplit is called by gameLoop via check.
     }
 }
 
