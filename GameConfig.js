@@ -10,9 +10,10 @@ export const GameConfig = {
     Player: {
         baseSpeed: 2,
         maxAtp: 100,
-        baseMaxAmino: 3,
-        baseMaxNucleotides: 3, // [NEW] DNA byggesten
-        moveCost: 0.001,
+        baseMaxAmino: 6, // [UPDATED] Max 6
+        baseMaxNucleotides: 6, // [UPDATED] Max 6
+        divisionCost: { amino: 3, nucleotide: 3 }, // [NEW] Explicit division cost
+        moveCost: 0.0001, // [UPDATED] 10% of previous (0.001 -> 0.0001)
         mutationRate: 1.0,
         backMutationRate: 0.0,
         mutationCosts: {

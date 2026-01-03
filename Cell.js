@@ -278,7 +278,7 @@ export class Cell {
         }
 
         // MOVEMENT
-        if (this.isPlayer && inputKeys) {
+        if (this.isPlayer && inputKeys && this.alive) { // [FIX] Dead cells cannot move
             // Abilities
             if (inputKeys.s && inputKeys.c) { // Cheat
                 this.atp = this.maxAtp;
@@ -316,7 +316,7 @@ export class Cell {
                 const len = Math.sqrt(moveX*moveX + moveY*moveY);
                 this.x += (moveX/len) * moveSpeed;
                 this.y += (moveY/len) * moveSpeed;
-                this.atp -= 0.05; // Simplified cost
+                this.atp -= GameConfig.Player.moveCost; // [UPDATED] Use Config
             } else if (dist > this.radius && !this.genes.pili) {
                 // Snail Mode: Don't rotate body, just set moveAngle
                 this.moveAngle = Math.atan2(dy, dx);
@@ -329,7 +329,7 @@ export class Cell {
                 this.currentSpeed = totalSpeed;
                 this.x += (dx/dist) * totalSpeed;
                 this.y += (dy/dist) * totalSpeed;
-                this.atp -= 0.05 * speedFactor;
+                this.atp -= GameConfig.Player.moveCost * speedFactor; // [UPDATED] Use Config
             } else if (this.genes.pili && this.piliState === 'retracting') {
                 const mx = Math.cos(this.piliTargetAngle) * piliMoveSpeed;
                 const my = Math.sin(this.piliTargetAngle) * piliMoveSpeed;
@@ -352,8 +352,36 @@ export class Cell {
         this.x += (Math.random() - 0.5) * 0.5;
         this.y += (Math.random() - 0.5) * 0.5;
 
-        // Dynamic Collision Radius (Match visual stretch)
+        // Growth Logic (Size based on division progress)
+        // Check if we have resources for division
+        const divCost = GameConfig.Player.divisionCost;
+        let growthFactor = 0;
+        if (this.maxAminoAcids > 0) { // Safety
+             // Simple progress ratio: (Amino/Cost + Nucleo/Cost) / 2
+             // Or based on total relative to cost.
+             // Request: "Når cellen har optaget prisen... vokset til dobbelt størrelse"
+             // Let's allow > 1.0 if they have more than cost? No, cap at division readiness.
+             const aminoP = Math.min(1, this.aminoAcids / divCost.amino);
+             const nucleoP = Math.min(1, this.nucleotides / divCost.nucleotide);
+             // Average progress? Or min? "Optaget amino OG nucleotider".
+             // Growth implies mass accumulation.
+             growthFactor = (aminoP + nucleoP) / 2.0;
+        }
+
+        // Base Radius = 20. Target Double Size (Area or Radius?).
+        // "Dobbelt størrelse" usually means 2x visible area -> r * 1.41.
+        // Let's use 1.5x radius for clear feedback.
+        // Range: 20 -> 30.
+        // And reset happens on split because resources drop.
+
+        // Apply Growth to base morphology (handled in Renderer)
+        // But here we set collision radius.
+        const grownRadius = this.minRadius * (1 + growthFactor * 0.5);
+        this.morphology.radius = grownRadius; // Sync visual radius
+
+        // Dynamic Collision Radius (Match visual stretch + Growth)
         // Snail stretches forward based on speed. We expand hit circle to cover the snout.
+        // Use the GROWN radius as base.
         const baseR = this.morphology.radius;
         const speedFactor = Math.min(this.currentSpeed / 2.0, 1.5);
         const stretch = speedFactor * 10;

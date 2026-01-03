@@ -9,6 +9,7 @@ export function initPlayer(canvasWidth, canvasHeight) {
 }
 
 // Funktion til at skifte krop!
+// Updates the global active player cell reference and handles state toggling.
 export function setActiveCell(newCell) {
     // Gør den gamle til NPC
     if (activeCell) {

@@ -689,7 +689,10 @@ function handleCellSwitch() {
 
 function handleDivision() {
     // 1. Check for Trigger (Key Press + Resources + Not already dividing)
-    if (activeCell && keys.m && activeCell.aminoAcids >= activeCell.maxAminoAcids) {
+    const divCost = GameConfig.Player.divisionCost;
+    const canAfford = activeCell && activeCell.aminoAcids >= divCost.amino && activeCell.nucleotides >= divCost.nucleotide;
+
+    if (activeCell && keys.m && canAfford) {
         if (!activeCell.isDividing) {
             activeCell.startDivision();
             // Optional: Play a sound? "glop"
@@ -1070,19 +1073,21 @@ function updateHUD() {
         const atpVal = document.getElementById('hudAtpVal');
         if (atpVal) atpVal.innerText = `${Math.floor(activeCell.atp)} / ${activeCell.maxAtp}`;
 
-        // Amino
+        // Amino (Show Division Cost hint)
+        const divCost = GameConfig.Player.divisionCost;
         const aminoPct = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 100;
         const aminoBar = document.getElementById('hudAminoBar');
         if (aminoBar) aminoBar.style.width = aminoPct + '%';
         const aminoVal = document.getElementById('hudAminoVal');
-        if (aminoVal) aminoVal.innerText = `${activeCell.aminoAcids} / ${activeCell.maxAminoAcids}`;
+        // Format: Current / Max (Div Cost: X)
+        if (aminoVal) aminoVal.innerText = `${activeCell.aminoAcids} / ${activeCell.maxAminoAcids} (Div: ${divCost.amino})`;
 
         // Nucleotides
         const nucleoPct = (activeCell.nucleotides / activeCell.maxNucleotides) * 100;
         const nucleoBar = document.getElementById('hudNucleoBar');
         if (nucleoBar) nucleoBar.style.width = nucleoPct + '%';
         const nucleoVal = document.getElementById('hudNucleoVal');
-        if (nucleoVal) nucleoVal.innerText = `${activeCell.nucleotides} / ${activeCell.maxNucleotides}`;
+        if (nucleoVal) nucleoVal.innerText = `${activeCell.nucleotides} / ${activeCell.maxNucleotides} (Div: ${divCost.nucleotide})`;
 
     } else {
         // Observer Mode / Dead
