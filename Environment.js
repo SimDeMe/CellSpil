@@ -903,7 +903,8 @@ function syncLayer(dataList, layer, drawFunc) {
         // Position Update
         item.graphic.x = item.x;
         item.graphic.y = item.y;
-        item.graphic.rotation = item.angle || item.moveAngle || 0;
+        // Respect explicit 0 angle
+        item.graphic.rotation = (typeof item.angle === 'number') ? item.angle : (item.moveAngle || 0);
     }
 
     // 2. Sweep (Remove unused graphics)

@@ -293,13 +293,19 @@ export class Cell {
             if (inputKeys.right) moveX += 1;
 
             if ((moveX !== 0 || moveY !== 0) && !this.genes.pili) {
-                this.angle = Math.atan2(moveY, moveX);
+                // Snail Mode: Don't rotate body, just set moveAngle
+                this.moveAngle = Math.atan2(moveY, moveX);
+                this.angle = 0; // Fix rotation
+
                 const len = Math.sqrt(moveX*moveX + moveY*moveY);
                 this.x += (moveX/len) * moveSpeed;
                 this.y += (moveY/len) * moveSpeed;
                 this.atp -= 0.05; // Simplified cost
             } else if (dist > this.radius && !this.genes.pili) {
-                this.angle = Math.atan2(dy, dx);
+                // Snail Mode: Don't rotate body, just set moveAngle
+                this.moveAngle = Math.atan2(dy, dx);
+                this.angle = 0; // Fix rotation
+
                 // FIXED: distance variable undefined -> dist
                 let speedFactor = Math.min(1, (dist - this.radius)/200);
 
