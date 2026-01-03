@@ -97,9 +97,7 @@ export class Cell {
         trait.apply(this);
 
         // Sync Visuals
-        if (trait.id === 'gram_positive') {
-            this.color = 0x5C4033; // Dark
-        }
+        // (Color changes removed for Gram Positive to keep organic color)
     }
 
     removeTrait(traitId) {

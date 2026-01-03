@@ -54,6 +54,7 @@ export class GramPositiveWall extends Trait {
     apply(cell) {
         cell.stats.defense += 5;
         cell.stats.permeability *= 0.8; // Harder to get stuff in
+        cell.morphology.stiffness = 1.0; // Stiffer wall
     }
 }
 

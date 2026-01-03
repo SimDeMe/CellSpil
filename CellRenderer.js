@@ -52,50 +52,15 @@ export class CellRenderer {
                 const diff = angle - moveAngle;
                 const cos = Math.cos(diff);
 
-                // If aligned (cos near 1), stretch.
-                // If perpendicular (cos near 0), squeeze slightly?
-                // Stretch forward (+cos) and backward (-cos)?
-                // Or "Snail" = Drag effect?
-                // Usually "Snail" means elongating the body along the axis of travel.
-
                 if (speedFactor > 0.05) {
-                    // Simple Ellipse-like stretch along movement axis
-                    // Stretch amount
-                    const stretch = speedFactor * 10; // e.g. +10px at max speed
-                    // Squeeze amount (preserve area approx)
-                    const squeeze = -speedFactor * 3;
+                    const stretch = speedFactor * 10;
 
-                    // Cos^2 for axis alignment (both front and back stretch)
-                    // Or just Cos for front-heavy?
-                    // User said "membranen der strækker sig i den retning".
-                    // Let's bias forward.
+                    // Smooth deformation function (Cardioid-like) to avoid sharp edges.
+                    // (cos(diff) + 1) goes from 0 to 2. Normalized 0..1 via /2.
+                    // Pow 2 makes it sharper at the front but still smooth everywhere.
 
-                    const deformation = (Math.cos(diff) * stretch);
-                    // This stretches front, shrinks back.
-                    // To keep back from shrinking too much into negative, maybe scale.
-                    // Better: Ellipse distortion.
-                    // Radial offset = stretch * cos(diff) -> Moves center? No.
-
-                    // Let's add to radius.
-                    // Front (diff=0) -> +stretch. Back (diff=PI) -> -stretch.
-                    // This shifts the shape forward.
-                    // We want to STRETCH, i.e., elongate.
-                    // So Front extends, Back extends (or stays).
-
-                    // Let's use: rad += stretch * Math.abs(Math.cos(diff));
-                    // This makes it an oval.
-
-                    // User "Strækker sig i den retning" -> "Extends in that direction".
-                    // Maybe asymmetrical? Like a teardrop?
-                    // Front extends, back stays round?
-
-                    if (Math.abs(diff) < Math.PI/2) {
-                        // Front half
-                        rad += Math.cos(diff) * stretch;
-                    } else {
-                        // Back half - maybe trailing effect?
-                        // rad += Math.cos(diff) * stretch * 0.2;
-                    }
+                    const factor = (Math.cos(diff) + 1) / 2; // 0..1 smooth
+                    rad += Math.pow(factor, 2) * stretch;
                 }
 
                 const x = Math.cos(angle) * rad;
