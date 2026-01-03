@@ -278,74 +278,76 @@ export class Cell {
         }
 
         // MOVEMENT
-        if (this.isPlayer && inputKeys && this.alive) { // [FIX] Dead cells cannot move
-            // Abilities
-            if (inputKeys.s && inputKeys.c) { // Cheat
-                this.atp = this.maxAtp;
-                this.aminoAcids = this.maxAminoAcids;
-            }
-            if (inputKeys.e && this.genes.toxin && this.onAction) {
-                if (this.atp >= 15 && this.aminoAcids >= 1) {
-                    this.onAction('toxin', this.x, this.y);
-                    this.atp -= 15; this.aminoAcids -= 1; inputKeys.e = false;
+        if (this.alive) {
+            if (this.isPlayer && inputKeys) {
+                // Abilities
+                if (inputKeys.s && inputKeys.c) { // Cheat
+                    this.atp = this.maxAtp;
+                    this.aminoAcids = this.maxAminoAcids;
                 }
-            }
-            if (inputKeys.r && this.genes.protease && this.onAction) {
-                if (this.atp >= 10 && this.aminoAcids >= 1) {
-                    this.onAction('protease', this.x, this.y);
-                    this.atp -= 10; this.aminoAcids -= 1; inputKeys.r = false;
+                if (inputKeys.e && this.genes.toxin && this.onAction) {
+                    if (this.atp >= 15 && this.aminoAcids >= 1) {
+                        this.onAction('toxin', this.x, this.y);
+                        this.atp -= 15; this.aminoAcids -= 1; inputKeys.e = false;
+                    }
                 }
+                if (inputKeys.r && this.genes.protease && this.onAction) {
+                    if (this.atp >= 10 && this.aminoAcids >= 1) {
+                        this.onAction('protease', this.x, this.y);
+                        this.atp -= 10; this.aminoAcids -= 1; inputKeys.r = false;
+                    }
+                }
+
+                // Calc Movement
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                let moveX = 0; let moveY = 0;
+                if (inputKeys.up) moveY -= 1;
+                if (inputKeys.down) moveY += 1;
+                if (inputKeys.left) moveX -= 1;
+                if (inputKeys.right) moveX += 1;
+
+                if ((moveX !== 0 || moveY !== 0) && !this.genes.pili) {
+                    // Snail Mode: Don't rotate body, just set moveAngle
+                    this.moveAngle = Math.atan2(moveY, moveX);
+                    this.angle = 0; // Fix rotation
+
+                    const len = Math.sqrt(moveX*moveX + moveY*moveY);
+                    this.x += (moveX/len) * moveSpeed;
+                    this.y += (moveY/len) * moveSpeed;
+                    this.atp -= GameConfig.Player.moveCost; // [UPDATED] Use Config
+                } else if (dist > this.radius && !this.genes.pili) {
+                    // Snail Mode: Don't rotate body, just set moveAngle
+                    this.moveAngle = Math.atan2(dy, dx);
+                    this.angle = 0; // Fix rotation
+
+                    // FIXED: distance variable undefined -> dist
+                    let speedFactor = Math.min(1, (dist - this.radius)/200);
+
+                    const totalSpeed = moveSpeed * speedFactor;
+                    this.currentSpeed = totalSpeed;
+                    this.x += (dx/dist) * totalSpeed;
+                    this.y += (dy/dist) * totalSpeed;
+                    this.atp -= GameConfig.Player.moveCost * speedFactor; // [UPDATED] Use Config
+                } else if (this.genes.pili && this.piliState === 'retracting') {
+                    const mx = Math.cos(this.piliTargetAngle) * piliMoveSpeed;
+                    const my = Math.sin(this.piliTargetAngle) * piliMoveSpeed;
+                    this.currentSpeed = piliMoveSpeed;
+                    this.x += mx;
+                    this.y += my;
+                    this.atp -= 0.1;
+                }
+            } else {
+                // NPC
+                this.moveAngle += (Math.random() - 0.5) * 0.1;
+                const npcSpeed = moveSpeed * 0.5;
+                this.currentSpeed = npcSpeed;
+                this.x += Math.cos(this.moveAngle) * npcSpeed;
+                this.y += Math.sin(this.moveAngle) * npcSpeed;
+                this.atp -= 0.01;
             }
-
-            // Calc Movement
-            const dx = mouse.x - this.x;
-            const dy = mouse.y - this.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-
-            let moveX = 0; let moveY = 0;
-            if (inputKeys.up) moveY -= 1;
-            if (inputKeys.down) moveY += 1;
-            if (inputKeys.left) moveX -= 1;
-            if (inputKeys.right) moveX += 1;
-
-            if ((moveX !== 0 || moveY !== 0) && !this.genes.pili) {
-                // Snail Mode: Don't rotate body, just set moveAngle
-                this.moveAngle = Math.atan2(moveY, moveX);
-                this.angle = 0; // Fix rotation
-
-                const len = Math.sqrt(moveX*moveX + moveY*moveY);
-                this.x += (moveX/len) * moveSpeed;
-                this.y += (moveY/len) * moveSpeed;
-                this.atp -= GameConfig.Player.moveCost; // [UPDATED] Use Config
-            } else if (dist > this.radius && !this.genes.pili) {
-                // Snail Mode: Don't rotate body, just set moveAngle
-                this.moveAngle = Math.atan2(dy, dx);
-                this.angle = 0; // Fix rotation
-
-                // FIXED: distance variable undefined -> dist
-                let speedFactor = Math.min(1, (dist - this.radius)/200);
-
-                const totalSpeed = moveSpeed * speedFactor;
-                this.currentSpeed = totalSpeed;
-                this.x += (dx/dist) * totalSpeed;
-                this.y += (dy/dist) * totalSpeed;
-                this.atp -= GameConfig.Player.moveCost * speedFactor; // [UPDATED] Use Config
-            } else if (this.genes.pili && this.piliState === 'retracting') {
-                const mx = Math.cos(this.piliTargetAngle) * piliMoveSpeed;
-                const my = Math.sin(this.piliTargetAngle) * piliMoveSpeed;
-                this.currentSpeed = piliMoveSpeed;
-                this.x += mx;
-                this.y += my;
-                this.atp -= 0.1;
-            }
-        } else {
-            // NPC
-            this.moveAngle += (Math.random() - 0.5) * 0.1;
-            const npcSpeed = moveSpeed * 0.5;
-            this.currentSpeed = npcSpeed;
-            this.x += Math.cos(this.moveAngle) * npcSpeed;
-            this.y += Math.sin(this.moveAngle) * npcSpeed;
-            this.atp -= 0.01;
         }
 
         // Brownian & Bounds

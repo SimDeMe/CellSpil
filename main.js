@@ -247,6 +247,42 @@ function setupDebugSystem() {
         debugControls.prepend(row);
     }
 
+    // 4b. Mutation Rate Slider
+    let mutRateInput = document.getElementById('mutRateInput');
+    if (!mutRateInput && debugControls) {
+        const row = document.createElement('div');
+        row.style.marginBottom = "10px";
+        row.style.borderBottom = "1px solid #444";
+        row.style.paddingBottom = "10px";
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.gap = "10px";
+
+        mutRateInput = document.createElement('input');
+        mutRateInput.type = 'range';
+        mutRateInput.id = 'mutRateInput';
+        mutRateInput.min = "0";
+        mutRateInput.max = "1";
+        mutRateInput.step = "0.1";
+        mutRateInput.value = GameConfig.Player.mutationRate;
+
+        const label = document.createElement('label');
+        label.id = 'mutRateLabel';
+        label.style.color = "#FFF";
+        label.innerText = `Mut. Rate: ${(GameConfig.Player.mutationRate * 100).toFixed(0)}%`;
+
+        // Update Config
+        mutRateInput.oninput = (e) => {
+             const val = parseFloat(e.target.value);
+             GameConfig.Player.mutationRate = val;
+             label.innerText = `Mut. Rate: ${(val * 100).toFixed(0)}%`;
+        };
+
+        row.appendChild(mutRateInput);
+        row.appendChild(label);
+        debugControls.appendChild(row);
+    }
+
     if (godModeCb) {
         godModeCb.checked = godMode;
         godModeCb.onchange = (e) => {

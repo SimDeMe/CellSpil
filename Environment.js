@@ -630,6 +630,10 @@ export function performSplit(parent) {
     const d1 = createDaughter(parent.x - offset, parent.y);
     const d2 = createDaughter(parent.x + offset, parent.y);
 
+    // Attempt Mutation on Daughters
+    attemptMutation(d1);
+    attemptMutation(d2);
+
     // Add to World
     addCellToEnvironment(d1);
     addCellToEnvironment(d2);
