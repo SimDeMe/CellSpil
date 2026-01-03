@@ -64,6 +64,14 @@ export class Cell {
         this.divisionTimer = 0;
         this.divisionDuration = 60;
 
+        // Secretion State (Animation)
+        this.secretion = {
+            state: 'idle', // idle, forming, releasing
+            type: null,
+            timer: 0,
+            maxTimer: 40
+        };
+
         // Action Callback
         this.onAction = null;
         this.engulfed = false;
@@ -96,9 +104,6 @@ export class Cell {
 
         this.traits.push(trait);
         trait.apply(this);
-
-        // Sync Visuals
-        // (Color changes removed for Gram Positive to keep organic color)
     }
 
     removeTrait(traitId) {
@@ -131,9 +136,6 @@ export class Cell {
         // Apply Genes mapping
         if (this.genes.gramPositive) this.addTrait(new GramPositiveWall());
         if (this.genes.flagellum) this.addTrait(new Flagellum());
-
-        // Eukaryote parts
-        // if (this.genes.nucleus) this.addTrait(new Nucleus()); // Example
 
         // Legacy Cost Calculation (Keep this for game balance as is)
         let cost = GameConfig.Player.baseMaxAmino;
@@ -172,7 +174,14 @@ export class Cell {
         this.addTrait(new CellDivisionTrait());
     }
 
-    // finalizeDivision is now handled by the Trait
+    startSecretion(type) {
+        if (this.secretion.state !== 'idle') return;
+        this.secretion.state = 'forming';
+        this.secretion.type = type;
+        this.secretion.timer = 0;
+        // Forming: 0-30. Releasing: 30-40.
+        this.secretion.maxTimer = 40;
+    }
 
     kill() {
         this.atp = 0;
@@ -188,24 +197,13 @@ export class Cell {
         // Check if DivisionTrait is active and in a state that blocks movement.
         const dividing = this.traits.find(t => t.id === 'cell_division');
         if (dividing && dividing.state !== 'finished') {
-            // Block movement during division?
-            // Original logic blocked update entirely.
-            // Let's allow update but block input/movement.
-            // Or just return to emulate old behavior:
-            // return;
-
-            // Better: Allow morphology update but skip movement.
-            // But 'morphology.update' is called below.
-            // Let's block movement only.
+             // Skip movement inputs
+             inputKeys = {}; // Disable input
         } else {
-            // Only update age if not dividing (or maybe always? old logic blocked it)
+            // Only update age if not dividing
             this.age++;
         }
 
-        if (dividing && dividing.state !== 'finished') {
-             // Skip movement inputs
-             inputKeys = {}; // Disable input
-        }
         this.isTakingDamage = false;
 
         // Morphology Update
@@ -213,6 +211,35 @@ export class Cell {
         // Speed affects phase update (Whip speed)
         const morphDt = 0.2 + (this.currentSpeed * 2.0);
         this.morphology.update(morphDt);
+
+        // Secretion Animation Logic
+        if (this.secretion.state !== 'idle') {
+            this.secretion.timer++;
+            // Phase 1: Forming (0 -> 30)
+            if (this.secretion.state === 'forming' && this.secretion.timer >= 30) {
+                this.secretion.state = 'releasing';
+            }
+            // Phase 2: Releasing (30 -> 40)
+            else if (this.secretion.state === 'releasing' && this.secretion.timer >= this.secretion.maxTimer) {
+                // Trigger Action
+                if (this.onAction) {
+                    // Position: Front of cell relative to movement/mouse
+                    const angle = (this.isPlayer && mouse)
+                        ? Math.atan2(mouse.y - this.y, mouse.x - this.x)
+                        : this.moveAngle;
+
+                    const offset = this.radius + 5;
+                    const sx = this.x + Math.cos(angle) * offset;
+                    const sy = this.y + Math.sin(angle) * offset;
+
+                    this.onAction(this.secretion.type, sx, sy, angle);
+                }
+
+                // Reset
+                this.secretion.state = 'idle';
+                this.secretion.timer = 0;
+            }
+        }
 
         // Endocytosis Animation
         if (this.engulfed) {
@@ -228,8 +255,6 @@ export class Cell {
 
         // --- UPKEEP ---
         // (Simplified from original for brevity, but logic remains)
-        // Ideally traits.forEach(t => t.update(this))
-
         let moveSpeed = 0.4;
         if (this.genes.megacytosis) moveSpeed *= 0.5;
         if (this.genes.flagellum) {
@@ -240,8 +265,7 @@ export class Cell {
         // Update Pili Logic (Legacy code integration)
         let piliMoveSpeed = 0;
         if (this.genes.pili && this.alive && this.isPlayer && mouse) {
-             // ... [Logic preserved from original file, abbreviated here for plan] ...
-             // Re-implementing the core logic:
+             // ... [Logic preserved] ...
             const dx = mouse.x - this.x;
             const dy = mouse.y - this.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
@@ -285,16 +309,25 @@ export class Cell {
                     this.atp = this.maxAtp;
                     this.aminoAcids = this.maxAminoAcids;
                 }
+
+                // Toxin (E)
                 if (inputKeys.e && this.genes.toxin && this.onAction) {
-                    if (this.atp >= 15 && this.aminoAcids >= 1) {
-                        this.onAction('toxin', this.x, this.y);
-                        this.atp -= 15; this.aminoAcids -= 1; inputKeys.e = false;
+                    // Start Animation if not already active
+                    if (this.atp >= 15 && this.aminoAcids >= 1 && this.secretion.state === 'idle') {
+                        this.startSecretion('toxin');
+                        this.atp -= 15;
+                        this.aminoAcids -= 1;
+                        inputKeys.e = false; // Consume key press
                     }
                 }
+
+                // Protease (R)
                 if (inputKeys.r && this.genes.protease && this.onAction) {
-                    if (this.atp >= 10 && this.aminoAcids >= 1) {
-                        this.onAction('protease', this.x, this.y);
-                        this.atp -= 10; this.aminoAcids -= 1; inputKeys.r = false;
+                    if (this.atp >= 10 && this.aminoAcids >= 1 && this.secretion.state === 'idle') {
+                        this.startSecretion('protease');
+                        this.atp -= 10;
+                        this.aminoAcids -= 1;
+                        inputKeys.r = false;
                     }
                 }
 
@@ -323,7 +356,6 @@ export class Cell {
                     this.moveAngle = Math.atan2(dy, dx);
                     this.angle = 0; // Fix rotation
 
-                    // FIXED: distance variable undefined -> dist
                     let speedFactor = Math.min(1, (dist - this.radius)/200);
 
                     const totalSpeed = moveSpeed * speedFactor;
@@ -354,40 +386,23 @@ export class Cell {
         this.x += (Math.random() - 0.5) * 0.5;
         this.y += (Math.random() - 0.5) * 0.5;
 
-        // Growth Logic (Size based on division progress)
-        // Check if we have resources for division
+        // Growth Logic
         const divCost = GameConfig.Player.divisionCost;
         let growthFactor = 0;
-        if (this.maxAminoAcids > 0) { // Safety
-             // Simple progress ratio: (Amino/Cost + Nucleo/Cost) / 2
-             // Or based on total relative to cost.
-             // Request: "Når cellen har optaget prisen... vokset til dobbelt størrelse"
-             // Let's allow > 1.0 if they have more than cost? No, cap at division readiness.
+        if (this.maxAminoAcids > 0) {
              const aminoP = Math.min(1, this.aminoAcids / divCost.amino);
              const nucleoP = Math.min(1, this.nucleotides / divCost.nucleotide);
-             // Average progress? Or min? "Optaget amino OG nucleotider".
-             // Growth implies mass accumulation.
              growthFactor = (aminoP + nucleoP) / 2.0;
         }
 
-        // Base Radius = 20. Target Double Size (Area or Radius?).
-        // "Dobbelt størrelse" usually means 2x visible area -> r * 1.41.
-        // Let's use 1.5x radius for clear feedback.
-        // Range: 20 -> 30.
-        // And reset happens on split because resources drop.
-
-        // Apply Growth to base morphology (handled in Renderer)
-        // But here we set collision radius.
         const grownRadius = this.minRadius * (1 + growthFactor * 0.5);
-        this.morphology.radius = grownRadius; // Sync visual radius
+        this.morphology.radius = grownRadius;
 
-        // Dynamic Collision Radius (Match visual stretch + Growth)
-        // Snail stretches forward based on speed. We expand hit circle to cover the snout.
-        // Use the GROWN radius as base.
+        // Dynamic Collision Radius
         const baseR = this.morphology.radius;
         const speedFactor = Math.min(this.currentSpeed / 2.0, 1.5);
         const stretch = speedFactor * 10;
-        this.radius = baseR + stretch; // Use full stretch for generous collision
+        this.radius = baseR + stretch;
 
         if (this.x - this.radius < 0) this.x = this.radius;
         else if (this.x + this.radius > worldWidth) this.x = worldWidth - this.radius;
@@ -403,7 +418,6 @@ export class Cell {
 
         // Division (Overlay)
         if (this.isDividing) {
-            // Simple visual override
              g.stroke({ width: 5, color: 0xFFFFFF });
         }
     }

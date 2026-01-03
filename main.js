@@ -493,11 +493,11 @@ function init() {
 
     // Setup Action Callback for Player (CRITICAL fix)
     if (activeCell) {
-        activeCell.onAction = (action, x, y) => {
+        activeCell.onAction = (action, x, y, angle) => {
             if (action === 'toxin') {
-                spawnToxinPulse(x, y);
+                spawnToxinPulse(x, y, angle);
             } else if (action === 'protease') {
-                spawnProteasePulse(x, y);
+                spawnProteasePulse(x, y, angle);
             }
         };
     }

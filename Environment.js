@@ -122,37 +122,44 @@ export const dangerZones = []; // [NEW] Environmental Hazards
 let dangerZoneSpawnTimer = 0;
 let nextZoneSpawnTime = 600; // Start fast for debug/first spawn
 
-export function spawnToxinPulse(x, y) {
+export function spawnToxinPulse(x, y, dir = 0) {
     console.log("Environment: Spawning Toxin at", x, y);
-    // Spawn 20 partikler i en cirkel
-    for (let i = 0; i < 20; i++) {
-        const angle = (Math.PI * 2 / 20) * i;
+    // Spawn 50 particles (Organic burst)
+    for (let i = 0; i < 50; i++) {
+        // Directional burst with spread (cone)
+        const spread = (Math.random() - 0.5) * 2.0; // +/- 1 radian (~60 deg)
+        const angle = dir + spread;
+        const speed = 2 + Math.random() * 3;
+
         toxinParticles.push({
             x: x,
             y: y,
-            vx: Math.cos(angle) * 3, // Hurtig spredning
-            vy: Math.sin(angle) * 3,
-            life: 120, // 2 sekunder ved 60fps
-            maxLife: 120,
-            type: 'toxin', // VISUAL HELPER
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 180,
+            maxLife: 180,
+            type: 'toxin',
             color: '#00E676'
         });
     }
 }
 
-export function spawnProteasePulse(x, y) {
+export function spawnProteasePulse(x, y, dir = 0) {
     console.log("Environment: Spawning Protease at", x, y);
-    // Proteaser spredes langsommere men lever længere
-    for (let i = 0; i < 24; i++) {
-        const angle = (Math.PI * 2 / 24) * i;
+    // 50 particles
+    for (let i = 0; i < 50; i++) {
+        const spread = (Math.random() - 0.5) * 2.0;
+        const angle = dir + spread;
+        const speed = 1.5 + Math.random() * 2.5;
+
         proteaseParticles.push({
             x: x,
             y: y,
-            vx: Math.cos(angle) * 1.5,
-            vy: Math.sin(angle) * 1.5,
-            life: 180, // 3 sekunder
-            maxLife: 180,
-            type: 'protease', // VISUAL HELPER
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 240,
+            maxLife: 240,
+            type: 'protease',
             color: '#E91E63'
         });
     }
@@ -639,14 +646,9 @@ export function performSplit(parent) {
         d1.isPlayer = true;
         // setActiveCell imports from Player.js (added to imports)
         setActiveCell(d1);
-        // Ensure d1 is removed from otherCells (setActiveCell usually handles this if called correctly?
-        // setActiveCell sets activeCell reference. It does NOT remove from otherCells.
-        // But addCellToEnvironment adds to otherCells.
-        // So we should remove d1 from otherCells?
-        // Let's check setActiveCell logic.
-        // It just sets the pointer.
-        // Logic in handleCellSwitch: removeCellFromEnvironment(clicked); setActiveCell(clicked).
-        // So we must remove d1 from otherCells if we make it player.
+        // Transfer Action Callback
+        d1.onAction = parent.onAction;
+        // Ensure d1 is removed from otherCells
         removeCellFromEnvironment(d1);
     }
 
