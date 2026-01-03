@@ -239,7 +239,7 @@ export class Cell {
 
         // Update Pili Logic (Legacy code integration)
         let piliMoveSpeed = 0;
-        if (this.genes.pili && this.alive && this.isPlayer) {
+        if (this.genes.pili && this.alive && this.isPlayer && mouse) {
              // ... [Logic preserved from original file, abbreviated here for plan] ...
              // Re-implementing the core logic:
             const dx = mouse.x - this.x;
