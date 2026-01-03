@@ -34,11 +34,17 @@ function syncParticles(list, layer, drawFn) {
 
 // --- PIXI CONTAINERS ---
 export let worldContainer;
-let foodLayer, toxinLayer, zoneLayer, cellLayer, dangerZoneLayer;
+let foodLayer, toxinLayer, proteaseLayer, zoneLayer, cellLayer, dangerZoneLayer;
 let appInstance; // Ref to pixi app if needed
 
 export function initEnvironment(app) {
     appInstance = app;
+
+    // cleanup previous world if exists
+    if (worldContainer) {
+        app.stage.removeChild(worldContainer);
+        worldContainer.destroy({ children: true });
+    }
 
     // Create World Container (Camera pivot)
     worldContainer = new PIXI.Container();
@@ -55,17 +61,21 @@ export function initEnvironment(app) {
     zoneLayer = new PIXI.Container();
     foodLayer = new PIXI.Container();
     toxinLayer = new PIXI.Container();
+    proteaseLayer = new PIXI.Container();
     cellLayer = new PIXI.Container(); // Enemies & Player
 
     worldContainer.addChild(zoneLayer);
     worldContainer.addChild(foodLayer);
     worldContainer.addChild(toxinLayer);
+    worldContainer.addChild(proteaseLayer);
     worldContainer.addChild(cellLayer);
 
     // Init Logic
     foodParticles.length = 0;
     otherCells.length = 0;
     dangerZones.length = 0;
+    toxinParticles.length = 0; // [FIX] Clear Toxins
+    proteaseParticles.length = 0; // [FIX] Clear Proteases
 
     // Spawn Initial Food
     // Spawn Initial Food (Clumped)
@@ -113,6 +123,7 @@ let dangerZoneSpawnTimer = 0;
 let nextZoneSpawnTime = 600; // Start fast for debug/first spawn
 
 export function spawnToxinPulse(x, y) {
+    console.log("Environment: Spawning Toxin at", x, y);
     // Spawn 20 partikler i en cirkel
     for (let i = 0; i < 20; i++) {
         const angle = (Math.PI * 2 / 20) * i;
@@ -122,12 +133,15 @@ export function spawnToxinPulse(x, y) {
             vx: Math.cos(angle) * 3, // Hurtig spredning
             vy: Math.sin(angle) * 3,
             life: 120, // 2 sekunder ved 60fps
-            maxLife: 120
+            maxLife: 120,
+            type: 'toxin', // VISUAL HELPER
+            color: '#00E676'
         });
     }
 }
 
 export function spawnProteasePulse(x, y) {
+    console.log("Environment: Spawning Protease at", x, y);
     // Proteaser spredes langsommere men lever længere
     for (let i = 0; i < 24; i++) {
         const angle = (Math.PI * 2 / 24) * i;
@@ -137,7 +151,9 @@ export function spawnProteasePulse(x, y) {
             vx: Math.cos(angle) * 1.5,
             vy: Math.sin(angle) * 1.5,
             life: 180, // 3 sekunder
-            maxLife: 180
+            maxLife: 180,
+            type: 'protease', // VISUAL HELPER
+            color: '#E91E63'
         });
     }
 }
@@ -490,7 +506,8 @@ export function attemptMutation(cell) {
 
         // TIER 1: MOVEMENT
         if (!g.pili && !g.flagellum) {
-            possibleMutations.push('pili', 'flagellum');
+            // [MOD] Pili disabled temporarily
+            possibleMutations.push('flagellum');
         }
         else if (!g.toxin || !g.protease || !g.gramPositive) {
             // TIER 2: Abilities
@@ -500,10 +517,16 @@ export function attemptMutation(cell) {
         }
         else {
             // TIER 3: Upgrades
+            /* [MOD] Pili Upgrades Disabled
             if (g.pili) {
                 if (!g.highSpeedRetraction) possibleMutations.push('highSpeedRetraction');
                 if (!g.multiplexPili) possibleMutations.push('multiplexPili');
             }
+            */
+            if (g.flagellum) {
+                if (!g.highTorque) possibleMutations.push('highTorque');
+            }
+            if (!g.megacytosis) possibleMutations.push('megacytosis');
             if (g.flagellum) {
                 if (!g.highTorque) possibleMutations.push('highTorque');
             }
@@ -814,7 +837,9 @@ export function renderEnvironment(activeCell) {
     renderFrameId++;
 
     // 1. Sync Layers
-    syncLayer(dangerZones, worldContainer.children[0], drawDangerZone); // ZoneLayer is 0
+    // 1. Sync Layers
+    // zoneLayer is used via named variable below
+
     // Wait, accessing worldContainer.children by index is risky if order changes.
     // Better to export layers or expose them? 
     // `initEnvironment` creates them local variables.
@@ -837,7 +862,9 @@ export function renderEnvironment(activeCell) {
     syncLayer(dangerZones, zoneLayer, drawDangerZone);
     syncLayer(foodParticles, foodLayer, drawFood);
     syncLayer(toxinParticles, toxinLayer, drawToxin);
-    syncLayer(proteaseParticles, toxinLayer, drawProtease);
+    syncLayer(foodParticles, foodLayer, drawFood);
+    syncLayer(toxinParticles, toxinLayer, drawToxin);
+    syncLayer(proteaseParticles, proteaseLayer, drawProtease);
 
     // Cells (Player + NPCs)
     const allCells = [...otherCells];
@@ -893,13 +920,13 @@ function syncLayer(dataList, layer, drawFunc) {
 function drawFood(g, p, initial) {
     if (initial) {
         g.clear();
-        g.beginPath();
+        // PixiJS shape drawing
         if (p.type === 'glucose') {
             g.circle(0, 0, p.radius);
         } else {
             g.rect(-p.radius, -p.radius, p.radius * 2, p.radius * 2);
         }
-        g.fill(p.color);
+        g.fill({ color: p.color });
     }
 }
 
@@ -907,82 +934,29 @@ function drawToxin(g, p, initial) {
     g.clear();
     g.alpha = p.life / p.maxLife;
     g.circle(0, 0, 4);
-    g.fill('#00E676');
+    g.fill({ color: '#00E676' });
 }
 
 function drawProtease(g, p, initial) {
     g.clear();
     g.alpha = p.life / p.maxLife;
     g.circle(0, 0, 3);
-    g.fill('#E91E63');
+    g.fill({ color: '#E91E63' });
 }
 
 function drawDangerZone(g, z, initial) {
     g.clear();
     g.circle(0, 0, z.radius);
-    g.fill(GameConfig.DangerZones.colors[z.type] || 'rgba(0,0,0,0.1)');
+    g.fill({ color: GameConfig.DangerZones.colors[z.type] || 'rgba(0,0,0,0.1)' });
 }
 
 function drawCell(g, cell, initial) {
-    g.clear();
-
-    // Make sure pulse exists
-    const pulse = cell.pulse || 0;
-    const r = (cell.radius || 20) + Math.sin(pulse) * 2;
-
-    // Determine colors first
-    let fillColor = cell.color || '#888';
-    if (cell.alive && cell.aminoAcids >= cell.maxAminoAcids) {
-        fillColor = cell.isPlayer ? '#69F0AE' : '#FFF59D';
+    if (cell.draw) {
+        cell.draw(g);
+    } else {
+        // Fallback
+        g.clear();
+        g.circle(0, 0, cell.radius || 20);
+        g.fill({ color: cell.color || '#888' });
     }
-
-    // 1. Extras (Flagellum) - DRAWN FIRST (BEHIND)
-    if (cell.genes && cell.genes.flagellum && cell.alive) {
-        const tailLen = r * 2.5; // Longer tail
-
-        // Since we are drawing in local space (graphic is rotated), "Back" is simply Math.PI
-        const dir = Math.PI;
-
-        // Sine Wave Tail
-        const segments = 10;
-        const step = tailLen / segments;
-        const phase = cell._wavePhase || 0;
-
-        // Perpendicular vector for wave amplitude (relative to local Back)
-        const perpX = Math.cos(dir + Math.PI / 2);
-        const perpY = Math.sin(dir + Math.PI / 2);
-
-        // Direction vector
-        const dirX = Math.cos(dir);
-        const dirY = Math.sin(dir);
-
-        g.beginPath();
-        // Start at edge of cell
-        g.moveTo(dirX * r, dirY * r);
-
-        for (let i = 1; i <= segments; i++) {
-            const dist = i * step;
-            const amplitude = 5;
-
-            // Wave function: sin(k*x - w*t)
-            const wave = Math.sin(i * 0.8 - phase) * amplitude;
-
-            const px = (dirX * (r + dist)) + (perpX * wave);
-            const py = (dirY * (r + dist)) + (perpY * wave);
-
-            g.lineTo(px, py);
-        }
-
-        g.stroke({ width: 2, color: fillColor });
-    }
-
-    // 2. Body Shape (Circle) - DRAWN ON TOP
-    g.beginPath();
-    g.circle(0, 0, r);
-
-    // 3. Fill
-    g.fill(fillColor);
-
-    // 4. Stroke
-    g.stroke({ width: 3, color: cell.isPlayer ? '#81C784' : (cell.isBacillus ? '#FDD835' : '#666') });
 }

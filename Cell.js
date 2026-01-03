@@ -358,7 +358,7 @@ export class Cell {
         if (this.x - this.radius < 0) this.x = this.radius;
         else if (this.x + this.radius > width) this.x = width - this.radius;
         if (this.y - this.radius < 0) this.y = this.radius;
-        else if (this.y + this.radius > height) this.y = height - this.radius;
+        else if (this.y + this.radius > width) this.y = height - this.radius;
     }
 
     kill() {
@@ -367,145 +367,120 @@ export class Cell {
         this.color = '#444';
     }
 
-    draw(ctx) {
+    // [NEW] PixiJS Draw Method
+    draw(g) {
+        g.clear();
+
         // --- DIVISION ANIMATION ---
         if (this.isDividing) {
-            // Calculate deformation
-            // 0 -> 0.3: Elongate (Stretch)
-            // 0.3 -> 1.0: Constrict (Pinch)
             const progress = this.divisionTimer / this.divisionDuration;
             const r = this.radius;
-
-            // Separation distance (0 to r*1.2)
+            // Separation along local Forward axis (X)
             const separation = progress * r * 1.5;
 
-            // Constriction radius (r to 0) - starts after 30%
-            let constriction = r;
-            if (progress > 0.3) {
-                const constrictProgress = (progress - 0.3) / 0.7;
-                constriction = r * (1 - constrictProgress * 0.8); // Don't go to 0 completely, just thin
-            }
+            const x1 = -separation;
+            const y1 = 0;
+            const x2 = separation;
+            const y2 = 0;
 
-            // Draw as two overlapping circles that move apart
-            // To make it look "gooey", we draw a rect or lines connecting them if we want, 
-            // but just two circles moving apart with a "skin" is easier to start.
-
-            // For simplicity in this style: Draw two circles.
-            // Center is (this.x, this.y). We move them along X axis (for now, or random angle?)
-            // Let's use current Angle or just Horizontal. Horizontal is 0.
-            const angle = this.angle;
-
-            const x1 = this.x + Math.cos(angle) * -separation;
-            const y1 = this.y + Math.sin(angle) * -separation;
-
-            const x2 = this.x + Math.cos(angle) * separation;
-            const y2 = this.y + Math.sin(angle) * separation;
-
-            ctx.fillStyle = this.color;
-            ctx.strokeStyle = this.isPlayer ? '#81C784' : '#666';
-            ctx.lineWidth = 3;
+            const color = this.color;
+            const strokeColor = this.isPlayer ? 0x81C784 : 0x666666;
 
             // Circle 1
-            ctx.beginPath();
-            ctx.arc(x1, y1, r, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+            g.circle(x1, y1, r);
+            g.fill({ color: color });
+            g.stroke({ width: 3, color: strokeColor });
 
             // Circle 2
-            ctx.beginPath();
-            ctx.arc(x2, y2, r, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+            g.circle(x2, y2, r);
+            g.fill({ color: color });
+            g.stroke({ width: 3, color: strokeColor });
 
-            // Connector (The Pinch) - Only if not fully separated
-            if (progress < 0.9) {
-                ctx.beginPath();
-                const perpAngle = angle + Math.PI / 2;
-                // Draw a bridge...
-                // This is complex to get perfect without metabolab library, 
-                // but just overlapping circles often looks good enough for "cell division".
-                // We rely on the two circles overlapping.
-            }
             return; // Skip normal draw
         }
-
 
         const r = this.radius + Math.sin(this.pulse) * 2;
 
         // Flagellum Draw
         if (this.genes.flagellum && this.alive) {
             const tailLength = r * 1.5;
-            const direction = this.isPlayer ? (this.angle || 0) : this.moveAngle;
-            const angle = direction + Math.PI;
-            ctx.beginPath();
-            ctx.moveTo(this.x + Math.cos(angle) * r, this.y + Math.sin(angle) * r);
+            // In local space, Forward is 0, Back is PI.
+            const angle = Math.PI;
+
+            // Start Path
+            g.beginPath();
+            g.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
+
+            // Use _wavePhase which is updated in Environment.js render loop
+            const phase = this._wavePhase || 0;
+
             for (let i = 0; i < tailLength; i += 2) {
-                const wave = Math.sin(this.pulse * 2 + i * 0.2) * 5;
-                ctx.lineTo(this.x + Math.cos(angle) * (r + i) + Math.cos(angle + Math.PI / 2) * wave,
-                    this.y + Math.sin(angle) * (r + i) + Math.sin(angle + Math.PI / 2) * wave);
+                // Wave function matching the physics-like tail from Environment.js
+                // sin(i * k - phase)
+                const wave = Math.sin(i * 0.3 - phase) * 5;
+
+                // Local Coords (Relative to 0,0)
+                const px = Math.cos(angle) * (r + i) + Math.cos(angle + Math.PI / 2) * wave;
+                const py = Math.sin(angle) * (r + i) + Math.sin(angle + Math.PI / 2) * wave;
+                g.lineTo(px, py);
             }
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            g.stroke({ width: 2, color: this.color });
         }
 
         // PILI DRAW (Twitch Motility)
         if (this.genes.pili && this.alive) {
+            // DEBUG LOG (Remove later)
+            // if (this.isPlayer && Math.random() < 0.05) console.log("Pili State:", this.piliState, "Length:", this.piliLength.toFixed(1));
+
             if (this.piliState === 'extending' || this.piliState === 'retracting') {
-                ctx.strokeStyle = '#E0F7FA'; // Bright Cyan-ish
-                ctx.lineWidth = 1;
-                ctx.fillStyle = '#E0F7FA';
+                const piliColor = 0xE0F7FA; // Bright Cyan
 
-                // Helper to draw one strand
                 const drawStrand = (offsetAngle) => {
-                    const angle = this.piliTargetAngle + offsetAngle;
-                    const startX = this.x + Math.cos(angle) * r;
-                    const startY = this.y + Math.sin(angle) * r;
-                    const endX = this.x + Math.cos(angle) * (r + this.piliLength);
-                    const endY = this.y + Math.sin(angle) * (r + this.piliLength);
+                    // Calculate Local Angle
+                    // Target Global Angle - Current Global Rotation
+                    const currentRot = (this.isPlayer ? this.angle : this.moveAngle) || 0;
+                    const localTargetAngle = this.piliTargetAngle - currentRot;
 
-                    ctx.beginPath();
-                    ctx.moveTo(startX, startY);
-                    ctx.lineTo(endX, endY);
-                    ctx.stroke();
+                    const angle = localTargetAngle + offsetAngle;
 
-                    // Tip
-                    ctx.beginPath();
-                    ctx.arc(endX, endY, 2, 0, Math.PI * 2);
-                    ctx.fill();
+                    const startX = Math.cos(angle) * r;
+                    const startY = Math.sin(angle) * r;
+                    const endX = Math.cos(angle) * (r + this.piliLength);
+                    const endY = Math.sin(angle) * (r + this.piliLength);
+
+                    // Line
+                    g.beginPath();
+                    g.moveTo(startX, startY);
+                    g.lineTo(endX, endY);
+                    g.stroke({ width: 3, color: piliColor });
+
+                    // Tip 
+                    g.circle(endX, endY, 4);
+                    g.fill({ color: piliColor });
                 };
 
                 if (this.genes.multiplexPili) {
-                    // Two strands, angled +/- 15 degrees (0.26 rad)
                     drawStrand(-0.25);
                     drawStrand(0.25);
                 } else {
-                    // Single strand
                     drawStrand(0);
                 }
             }
         }
 
-        // Body
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-        // Shadow/Glow logic
+        // Body (Local 0,0)
+        g.circle(0, 0, r);
+
+        // Color Logic
+        let fillColor = this.color;
         if (this.alive && this.aminoAcids >= this.maxAminoAcids && this.nucleotides >= this.maxNucleotides) {
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00BCD4';
-            ctx.fillStyle = this.isPlayer ? '#69F0AE' : '#DDD';
-        } else {
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = this.color;
+            fillColor = this.isPlayer ? '#69F0AE' : '#DDDDDD'; // Highlight ready to divide
         }
-        ctx.fill();
-        ctx.shadowBlur = 0;
+
+        g.fill({ color: fillColor });
 
         // Border
-        if (this.alive) ctx.strokeStyle = this.isPlayer ? '#81C784' : '#666';
-        else ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.closePath();
+        const borderColor = this.alive ? (this.isPlayer ? 0x81C784 : 0x666666) : 0x000000;
+        g.stroke({ width: 3, color: borderColor });
     }
 }

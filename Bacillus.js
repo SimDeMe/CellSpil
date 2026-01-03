@@ -259,6 +259,61 @@ export class Bacillus extends Cell {
 
                 this.moveAngle += diff * 0.1; // Lidt hurtigere drejning
             }
+
+            // [NEW] EATING LOGIC
+            // Check collision with 'nearest' (which is our target)
+            if (minDst < this.radius + (nearest.radius || 5)) { // 5 is fallback if nearest has no radius (e.g. some obj)
+                // CONSUME!
+                if (nearest.isBacillus || nearest.isPlayer) {
+                    // Eat Cell (Attack)
+                    // Simple damage for now, or eat corpse
+                    // For Corpse:
+                    if (!nearest.alive) {
+                        // Eat corpse
+                        this.aminoAcids += nearest.maxAminoAcids * 0.1;
+                        nearest.shouldRemove = true; // Gone
+                        console.log("Bacillus ate corpse");
+                    } else {
+                        // Attack logic? Maybe later. Bacillus usually just eats food.
+                        // Megabacillus attacks.
+                        if (this.isMegabacillus) {
+                            // Damage logic
+                            // This requires accessing 'damage' method or reducing ATP directly
+                            nearest.atp -= 10;
+                            this.atp -= 1; // minor cost to attack
+                        }
+                    }
+                } else {
+                    // Eat Food Particle
+                    // Remove from array (Environment.js handles this by 'life' or splicing? 
+                    // Usually we splice the global array. 
+                    // But here we rely on 'foodParticles' passed as arg. 
+                    // We need to set 'shouldRemove' or splice it.
+                    // Looking at Cell.js logic: it usually calls a helper or splices.
+                    // Let's set a flag or life=0 if supported, or splice directly.
+
+                    // Direct Splice (Risky if iterating? No, we are in update, logic loop usually safe if safe iteration used)
+                    // But we are not iterating 'foodParticles' right here, 'nearest' is a reference.
+
+                    // Find index
+                    const idx = foodParticles.indexOf(nearest);
+                    if (idx > -1) {
+                        foodParticles.splice(idx, 1);
+
+                        // Gain Resources
+                        // Values from GameConfig
+                        if (nearest.type === 'glucose') this.atp += GameConfig.Resources.glucoseEnergy;
+                        if (nearest.type === 'amino') this.aminoAcids += GameConfig.Resources.aminoValue;
+                        if (nearest.type === 'nucleotide') this.nucleotides = (this.nucleotides || 0) + 1;
+
+                        this.atp = Math.min(this.atp, this.maxAtp);
+                        this.aminoAcids = Math.min(this.aminoAcids, this.maxAminoAcids);
+
+                        // Grow slightly?
+                        this.pulse = 1; // Visual feedback
+                    }
+                }
+            }
         }
 
         // Hvis vi bare drifter, men er tæt på andre -> Separer!
@@ -312,21 +367,22 @@ export class Bacillus extends Cell {
         }
     }
 
-    draw(ctx) {
+    draw(g) {
         // Stavformet (Capsule shape)
         const r = this.radius;
-        const len = this.isMegabacillus ? 80 : 40; // Længere hvis Mega
+        const len = this.isMegabacillus ? 80 : 40; // Mega len
 
-        ctx.translate(this.x, this.y);
-        // [FIX] Use correct angle if controlled by player
-        const rotation = (this.isPlayer) ? this.angle : this.moveAngle;
-        ctx.rotate(rotation);
+        g.clear();
 
-        ctx.beginPath();
-        // Tegn en "capsule" form: En rektangel med cirkler i enderne
-        // Eller bare en tyk linje med round caps
-        ctx.lineCap = "round";
-        ctx.lineWidth = r * 2;
+        // PixiJS handles position (x, y) and rotation in the parent container logic (Environment.js)
+        // So we draw at 0,0 relative to the cell center.
+
+        // HOWEVER, Environment.js sets `item.graphic.rotation = item.angle || item.moveAngle`.
+        // So the graphic is already rotated? 
+        // Let's check Environment.js:892 -> item.graphic.rotation = item.angle || item.moveAngle || 0;
+        // Yes. So we draw 'up right' or 'horizontal' assuming 0 rotation matches logic.
+        // Usually 0 rotation = facing East (Right).
+        // Our capsule should be horizontal centered at 0,0.
 
         // [NEW] Damage Blink Logic
         let drawColor = this.color;
@@ -338,24 +394,17 @@ export class Bacillus extends Cell {
             }
         }
 
-        ctx.strokeStyle = drawColor;
+        // Body Color
+        const bodyColor = this.alive ? (this.isMegabacillus ? '#FFAB91' : '#FFCC80') : '#555';
 
-        // Tegn krop
-        ctx.moveTo(-len / 2, 0);
-        ctx.lineTo(len / 2, 0);
-        ctx.stroke();
+        // Use PixiJS RoundRect for capsule
+        // x, y, w, h, radius
+        g.roundRect(-len / 2, -r, len, r * 2, r);
+        g.fill({ color: bodyColor });
+        g.stroke({ width: 2, color: drawColor });
 
-        // Indre glød/farve
-        ctx.lineWidth = r * 1.5;
-        // Alive glow?
-        if (this.isTakingDamage) {
-            ctx.strokeStyle = drawColor; // Use same blink color
-        } else {
-            ctx.strokeStyle = this.alive ? (this.isMegabacillus ? '#FFAB91' : '#FFCC80') : '#555';
-        }
-        ctx.stroke();
-
-        ctx.rotate(-rotation);
-        ctx.translate(-this.x, -this.y);
+        // Inner detail?
+        // g.circle(0, 0, r * 0.5);
+        // g.fill({ color: '#FFF', alpha: 0.3 });
     }
 }

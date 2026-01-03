@@ -19,8 +19,8 @@ export const GameConfig = {
             pili: 2, // Replaces Cilia
             flagellum: 3,
             megacytosis: 5,
-            toxin: 1,
-            protease: 2,
+            toxin: 1, // Amino Cost
+            protease: 1, // Amino Cost
             highTorque: 5,
             endocytosis: 8,
             highSpeedRetraction: 4, // [NEW] Upgrade for Pili
