@@ -5,7 +5,7 @@ import {
     initEnvironment, updateEnvironment, drawEnvironment,
     checkCollisions, spawnSisterCell, otherCells, foodParticles,
     getCellAtPosition, removeCellFromEnvironment, addCellToEnvironment,
-    setMutationCallback, setEventCallback, setMute, // [UPDATED]
+    setMutationCallback, setEventCallback, setMute,
     triggerInvasion, spawnToxinPulse, spawnProteasePulse,
     spawnMegabacillus, spawnSpecificFood, spawnBacillus, spawnBacillusChild,
     renderEnvironment, attemptMutation, performSplit
@@ -77,12 +77,18 @@ setupDebugSystem();
 setupPauseSystem();
 setupResetSystem();
 setupTimerSystem();
-setupProductionUI(); // [NEW]
-setupMuteButton(); // [NEW]
+setupProductionUI();
+setupMuteButton();
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
         toggleGlobalPause();
+    }
+    // Shortcuts for Production
+    if (e.key === '1') {
+        if (activeCell) activeCell.produce('toxin');
+    } else if (e.key === '2') {
+        if (activeCell) activeCell.produce('protease');
     }
 });
 
@@ -105,13 +111,12 @@ function toggleGlobalPause() {
 function toggleMute() {
     isMuted = !isMuted;
     ambientMusic.muted = isMuted;
-    setMute(isMuted); // Environment SFX
+    setMute(isMuted);
     const btn = document.getElementById('muteBtn');
     if (btn) btn.innerText = isMuted ? "🔇" : "🔊";
 }
 
 function setupMuteButton() {
-    // Add to top-left controls area
     const controls = document.querySelector('.controls-top-left');
     if (controls && !document.getElementById('muteBtn')) {
         const btn = document.createElement('button');
@@ -144,7 +149,6 @@ function setupResetSystem() {
 }
 
 function setupTimerSystem() {
-    // Add Timer Display to HUD
     const hud = document.getElementById('hud-stats');
     if (hud && !document.getElementById('gameTimerDisplay')) {
         const div = document.createElement('div');
@@ -152,31 +156,29 @@ function setupTimerSystem() {
         div.innerHTML = 'Time: <span id="gameTimerDisplay">00:00</span>';
         div.style.color = '#FFF';
         div.style.fontSize = '1.2em';
-        hud.prepend(div); // Add to top of stats
+        hud.prepend(div);
     }
     gameTimer = 0;
 }
 
 function setupProductionUI() {
-    // Add Production Buttons
     let container = document.getElementById('productionControls');
     if (!container) {
         container = document.createElement('div');
         container.id = 'productionControls';
         container.style.position = 'absolute';
         container.style.bottom = '20px';
-        container.style.right = '20px'; // Bottom Right
+        container.style.left = '20px'; // Bottom Left
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
         container.style.gap = '10px';
         document.body.appendChild(container);
     } else {
-        container.innerHTML = ''; // Clear if re-setup
+        container.innerHTML = '';
     }
 
-    // Style helper
     const styleBtn = (btn, color) => {
-        btn.className = 'hud-btn'; // Reuse class
+        btn.className = 'hud-btn';
         btn.style.background = color;
         btn.style.color = '#000';
         btn.style.fontWeight = 'bold';
@@ -185,17 +187,16 @@ function setupProductionUI() {
         btn.style.borderRadius = '5px';
         btn.style.cursor = 'pointer';
         btn.style.fontSize = '0.9em';
+        btn.style.textAlign = 'left';
     };
 
-    // Toxin Button
     const btnToxin = document.createElement('button');
-    btnToxin.innerText = "Synthesize Toxin (15 ATP, 1 Amino)";
+    btnToxin.innerText = "[1] Synthesize Toxin (15 ATP, 1 Amino)";
     styleBtn(btnToxin, '#00E676');
     btnToxin.onclick = () => { if (activeCell) activeCell.produce('toxin'); };
 
-    // Enzyme Button
     const btnEnzyme = document.createElement('button');
-    btnEnzyme.innerText = "Synthesize Enzyme (10 ATP, 1 Amino)";
+    btnEnzyme.innerText = "[2] Synthesize Enzyme (10 ATP, 1 Amino)";
     styleBtn(btnEnzyme, '#E91E63');
     btnEnzyme.onclick = () => { if (activeCell) activeCell.produce('protease'); };
 
@@ -205,7 +206,7 @@ function setupProductionUI() {
 
 function updateGameTimer(dt) {
     if (isPaused) return;
-    gameTimer += dt; // Seconds
+    gameTimer += dt;
 
     const display = document.getElementById('gameTimerDisplay');
     if (display) {
@@ -520,7 +521,7 @@ function init() {
     }
 
     setMutationCallback(showMutationPopup);
-    setEventCallback(showEventPopup); // [NEW]
+    setEventCallback(showEventPopup);
 
     initEnvironment(app);
 
@@ -529,29 +530,507 @@ function init() {
     setupPauseSystem();
     setupResetSystem();
     setupTimerSystem();
-    setupProductionUI(); // [NEW]
-    setupMuteButton(); // [NEW]
+    setupProductionUI();
+    setupMuteButton();
 }
 
-// ... rest of file (initDebugUI, renderDebugMutations, handleCellSwitch, handleDivision, toggleInspect, updateInspectorContent, renderMutationsTab, renderMetabolismTab, renderCellsTab, setupInspectorModal, updateHUD, updateUI, showInspectorSidebar, updateCamera, gameLoop, drawMinimap) ...
-// Note: I will need to provide the full file content or use REPLACE carefully.
-// Overwrite is safer as I have recent read.
-// I will include the rest of the functions below `init()` from my previous read.
+function toggleInspect() {
+    if (!activeCell) return;
 
-function initDebugUI() {
-    // ... (Keep existing implementation) ...
-    // Since overwrite replaces EVERYTHING, I must include all functions.
-    // I will append the rest of the file from my memory/previous read.
+    const modal = document.getElementById('inspectorModal');
+    if (!modal) return;
+
+    isInspecting = !isInspecting;
+
+    if (isInspecting) {
+        modal.classList.remove('hidden');
+        if (!isPaused) toggleGlobalPause();
+        updateInspectorContent();
+        const activeTab = document.querySelector('.modal-tab-btn.active');
+        if (!activeTab) {
+            document.querySelector('[data-tab="tabMutations"]').click();
+        }
+    } else {
+        modal.classList.add('hidden');
+        if (isPaused) toggleGlobalPause();
+    }
 }
-// Wait, I can't "append from memory". I must be explicit.
-// The `overwrite` tool requires full content.
-// I will use `read_file` to get the full content, modify it locally, and then `overwrite`.
-// Oh wait, I already read it in Step 5b logic preparation.
-// But `read_file` output in Step 5b was truncated in my mind? No, the tool output is full.
-// I will copy-paste the remaining functions from the Step 5b `read_file` output into the `overwrite` block.
 
-// ... (Copying functions from Step 5b output) ...
-// The output was:
-// ... setupDebugSystem ... renderDebugMutations ... updateDebugMutations ... handleCellSwitch ... handleDivision ... toggleInspect ... updateInspectorContent ... renderMutationsTab ... renderMetabolismTab ... renderCellsTab ... setupInspectorModal ... updateHUD ... updateUI ... showInspectorSidebar ... updateCamera ... gameLoop ... drawMinimap ...
+function updateInspectorContent() {
+    if (!activeCell) return;
+    const activeTabId = document.querySelector('.modal-tab-content.active').id;
+    if (activeTabId === 'tabMutations') {
+        renderMutationsTab();
+    } else if (activeTabId === 'tabMetabolism') {
+        renderMetabolismTab();
+    } else if (activeTabId === 'tabCells') {
+        renderCellsTab();
+    }
+}
 
-// I will construct the full file.
+function renderMutationsTab() {
+    const container = document.getElementById('mutationTreeContainer');
+    container.innerHTML = '';
+
+    const genes = activeCell.genes;
+    const tree = document.createElement('div');
+    tree.className = 'mutation-list';
+
+    const addItem = (key, name, desc) => {
+        const val = genes[key];
+        const hasGene = (typeof val === 'number') ? val > 0 : !!val;
+
+        const item = document.createElement('div');
+        item.className = `mutation-item ${hasGene ? 'unlocked' : 'locked'}`;
+
+        const icon = document.createElement('span');
+        icon.className = 'icon';
+        icon.innerText = hasGene ? '✅' : '🔒';
+
+        let displayName = name;
+        if (typeof val === 'number' && val > 0) {
+            displayName += ` (Lvl ${val})`;
+        }
+
+        const info = document.createElement('div');
+        info.className = 'info';
+        info.innerHTML = `<strong>${displayName}</strong><br><span style="font-size:0.8em; color:#aaa;">${desc}</span>`;
+
+        item.appendChild(icon);
+        item.appendChild(info);
+        tree.appendChild(item);
+    };
+
+    addItem('flagellum', 'Monotrichous Flagellum', 'En lang hale der giver kraftig fremdrift.');
+    addItem('pili', 'Type IV Pili', 'Gribekroge til twitch-bevægelse.');
+    addItem('toxin', 'Toxin Secretion (E)', 'Udskil gift skyer der dræber konkurrenter.');
+    addItem('protease', 'Protease Enzym (R)', 'Opløs døde celler (lig) og konverter dem til mad.');
+    addItem('photoreceptor', 'Photoreceptor', 'Kan registrere lys (ikke implementeret endnu).');
+    addItem('antibioticResistance', 'Antibiotic Resistance', 'Modstandsdygtig overfor visse stoffer.');
+    addItem('megacytosis', 'Megacytosis', 'Dobbel størrelse og HP.');
+    addItem('multiplexPili', 'Multiplex Pili', 'Bedre pili rækkevidde.');
+    addItem('highTorque', 'High-Torque Flagel', 'Hurtigere bevægelse.');
+    addItem('highSpeedRetraction', 'High-Speed Retraction', 'Hurtigere pili træk.');
+
+    addItem('atpStorage', 'ATP Lager', '+10% Max ATP per level (Max 5).');
+    addItem('aminoStorage', 'Aminosyre Lager', '+10% Max Aminosyrer per level (Max 5).');
+    addItem('nucleotideStorage', 'Nukleotid Lager', '+10% Max Nukleotider per level (Max 5).');
+
+    addItem('endocytosis', 'Endocytosis', 'Spis mindre celler direkte.');
+    addItem('gramPositive', 'Gram Positive', 'Tyk cellevæg (Defense).');
+
+    container.appendChild(tree);
+}
+
+function renderMetabolismTab() {
+    const container = document.getElementById('metabolismContainer');
+    container.innerHTML = '';
+
+    if (!activeCell) return;
+
+    const createStat = (label, val, max, color) => {
+        const group = document.createElement('div');
+        group.className = 'stat-group';
+        group.style.marginBottom = '15px';
+
+        const lbl = document.createElement('label');
+        lbl.innerText = `${label} (${Math.floor(val)} / ${max})`;
+        lbl.style.display = 'block';
+        lbl.style.marginBottom = '4px';
+
+        const barBg = document.createElement('div');
+        barBg.style.width = '100%';
+        barBg.style.height = '20px';
+        barBg.style.background = '#222';
+        barBg.style.borderRadius = '10px';
+        barBg.style.overflow = 'hidden';
+
+        const barFill = document.createElement('div');
+        const pct = Math.min(100, Math.max(0, (val / max) * 100));
+        barFill.style.width = `${pct}%`;
+        barFill.style.height = '100%';
+        barFill.style.background = color;
+        barFill.style.transition = "width 0.2s";
+
+        barBg.appendChild(barFill);
+        group.appendChild(lbl);
+        group.appendChild(barBg);
+        container.appendChild(group);
+    };
+
+    createStat("ATP (Energi)", activeCell.atp, activeCell.maxAtp, '#00E676');
+    createStat("Aminosyrer (Byggesten)", activeCell.aminoAcids, activeCell.maxAminoAcids, '#2979FF');
+    createStat("Nukleotider (DNA)", activeCell.nucleotides, activeCell.maxNucleotides, '#E040FB');
+
+    const details = document.createElement('div');
+    details.innerHTML = `
+        <h3 style="margin-top:20px; border-bottom:1px solid #444; padding-bottom:5px;">Stats</h3>
+        <p>Speed: <span style="color:#fff">${activeCell.genes.flagellum ? "High" : "Low"}</span></p>
+        <p>Defense: <span style="color:#fff">${activeCell.genes.gramPositive ? "High" : "Normal"}</span></p>
+        <p>Diet: <span style="color:#fff">Omnivore (Altædende)</span></p>
+    `;
+    container.appendChild(details);
+}
+
+function renderCellsTab() {
+    const container = document.getElementById('cellListContainer');
+    container.innerHTML = '';
+
+    const list = [...otherCells].sort((a, b) => {
+        return (b.isBacillus ? 1 : 0) - (a.isBacillus ? 1 : 0);
+    });
+
+    if (list.length === 0) {
+        container.innerHTML = "<p style='color:#777; padding:10px;'>Ingen andre celler i nærheden.</p>";
+        return;
+    }
+
+    list.forEach(cell => {
+        const item = document.createElement('div');
+        item.className = 'cell-list-item';
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.justifyContent = 'space-between';
+        item.style.background = '#1a1a1a';
+        item.style.padding = '10px';
+        item.style.marginBottom = '5px';
+        item.style.borderRadius = '4px';
+        item.style.borderLeft = cell.isBacillus ? '4px solid #FFEB3B' : '4px solid #4CAF50';
+
+        if (!cell.alive) {
+            item.style.opacity = '0.5';
+            item.style.borderLeft = '4px solid #888';
+        }
+
+        const info = document.createElement('div');
+        let type = cell.isBacillus ? "Bacillus (Enemy)" : "Ukendt Celle";
+        if (cell.isPlayer) type = "Spiller (Klon)";
+        if (!cell.alive) type += " (DØD)";
+
+        info.innerHTML = `<strong>${type}</strong><br><span style="font-size:0.8em; color:#aaa;">HP: ${Math.floor(cell.atp)}</span>`;
+
+        const actions = document.createElement('div');
+
+        const btnTake = document.createElement('button');
+        btnTake.className = 'action-btn';
+        btnTake.innerText = "🎮";
+        btnTake.title = "Overtag Styring";
+        btnTake.onclick = () => {
+            const oldPlayer = activeCell;
+            addCellToEnvironment(oldPlayer);
+            removeCellFromEnvironment(cell);
+            setActiveCell(cell);
+
+            cell.onAction = oldPlayer.onAction;
+            oldPlayer.onAction = null;
+
+            toggleInspect();
+            console.log("Switched to cell via Inspector");
+        };
+
+        const btnDna = document.createElement('button');
+        btnDna.className = 'action-btn secondary';
+        btnDna.innerText = "🧬";
+        btnDna.title = "Vis Gener";
+
+        const dnaDetail = document.createElement('div');
+        dnaDetail.className = 'dna-details hidden';
+        dnaDetail.style.display = 'none';
+
+        btnDna.onclick = () => {
+            const isHidden = dnaDetail.style.display === 'none' || dnaDetail.classList.contains('hidden');
+            if (isHidden) {
+                dnaDetail.classList.remove('hidden');
+                dnaDetail.style.display = 'block';
+                dnaDetail.style.background = '#222';
+                dnaDetail.style.padding = '8px';
+                dnaDetail.style.borderRadius = '4px';
+                dnaDetail.style.marginTop = '4px';
+                dnaDetail.style.color = '#eee';
+                dnaDetail.style.fontSize = '0.85em';
+                dnaDetail.style.border = '1px solid #444';
+
+                const active = [];
+                for (const key in cell.genes) {
+                    const val = cell.genes[key];
+                    if (val) {
+                        let name = key;
+                        if (key === 'flagellum') name = 'Flagellum';
+                        else if (key === 'pili') name = 'Type IV Pili';
+                        else if (key === 'toxin') name = 'Toxin';
+                        else if (key === 'protease') name = 'Protease';
+                        else if (key === 'gramPositive') name = 'Gram Positive';
+                        else if (key === 'megacytosis') name = 'Megacytosis';
+                        else if (key === 'endocytosis') name = 'Endocytosis';
+                        else if (key === 'highTorque') name = 'High Torque';
+                        else if (key === 'highSpeedRetraction') name = 'High Speed Retraction';
+                        else if (key === 'multiplexPili') name = 'Multiplex Pili';
+
+                        if (typeof val === 'number') {
+                            name += ` (Lvl ${val})`;
+                        }
+
+                        active.push("• " + name);
+                    }
+                }
+
+                if (active.length > 0) {
+                    dnaDetail.innerHTML = "<strong>Mutationer:</strong><br>" + active.join("<br>");
+                } else {
+                    dnaDetail.innerHTML = "<span style='color:#aaa'>Ingen mutationer fundet.</span>";
+                }
+            } else {
+                dnaDetail.style.display = 'none';
+            }
+        };
+
+        actions.appendChild(btnTake);
+        actions.appendChild(btnDna);
+
+        item.appendChild(info);
+        item.appendChild(actions);
+
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(item);
+        wrapper.appendChild(dnaDetail);
+
+        container.appendChild(wrapper);
+    });
+}
+
+function setupInspectorModal() {
+    const modal = document.getElementById('inspectorModal');
+    const closeBtn = document.getElementById('closeInspectBtn');
+    const tabBtns = document.querySelectorAll('.modal-tab-btn');
+    const tabContents = document.querySelectorAll('.modal-tab-content');
+
+    if (!modal) return;
+
+    const inspectBtn = document.getElementById('inspectBtn');
+    if (inspectBtn) {
+        inspectBtn.onclick = () => {
+            toggleInspect();
+        };
+    }
+
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            isInspecting = false;
+            modal.classList.add('hidden');
+            togglePause();
+        };
+    }
+
+    tabBtns.forEach(btn => {
+        btn.onclick = () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            btn.classList.add('active');
+            const targetId = btn.getAttribute('data-tab');
+            document.getElementById(targetId).classList.add('active');
+
+            if (activeCell) updateInspectorContent();
+        };
+    });
+}
+
+function updateHUD() {
+    document.getElementById('hudGen').innerText = generation;
+    const pop = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
+    document.getElementById('hudPop').innerText = pop;
+
+    const statusOverlay = document.getElementById('statusOverlay');
+    if (isPaused && !isInspecting) {
+        statusOverlay.innerText = "PAUSE";
+        statusOverlay.classList.remove('hidden');
+    } else if (isObserverMode) {
+        statusOverlay.innerText = "OBSERVER MODE";
+        statusOverlay.classList.remove('hidden');
+    } else {
+        statusOverlay.classList.add('hidden');
+    }
+
+    if (activeCell) {
+        const atpPct = (activeCell.atp / activeCell.maxAtp) * 100;
+        const atpBar = document.getElementById('hudAtpBar');
+        if (atpBar) atpBar.style.width = atpPct + '%';
+        const atpVal = document.getElementById('hudAtpVal');
+        if (atpVal) atpVal.innerText = `${Math.floor(activeCell.atp)} / ${activeCell.maxAtp}`;
+
+        const divCost = GameConfig.Player.divisionCost;
+        const aminoPct = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 100;
+        const aminoBar = document.getElementById('hudAminoBar');
+        if (aminoBar) aminoBar.style.width = aminoPct + '%';
+        const aminoVal = document.getElementById('hudAminoVal');
+        if (aminoVal) aminoVal.innerText = `${activeCell.aminoAcids} / ${activeCell.maxAminoAcids} (Div: ${divCost.amino})`;
+
+        const nucleoPct = (activeCell.nucleotides / activeCell.maxNucleotides) * 100;
+        const nucleoBar = document.getElementById('hudNucleoBar');
+        if (nucleoBar) nucleoBar.style.width = nucleoPct + '%';
+        const nucleoVal = document.getElementById('hudNucleoVal');
+        if (nucleoVal) nucleoVal.innerText = `${activeCell.nucleotides} / ${activeCell.maxNucleotides} (Div: ${divCost.nucleotide})`;
+
+    } else {
+        document.getElementById('hudAtpVal').innerText = "-";
+        document.getElementById('hudAminoVal').innerText = "-";
+        document.getElementById('hudNucleoVal').innerText = "-";
+        if (document.getElementById('hudAtpBar')) document.getElementById('hudAtpBar').style.width = '0%';
+        if (document.getElementById('hudAminoBar')) document.getElementById('hudAminoBar').style.width = '0%';
+        if (document.getElementById('hudNucleoBar')) document.getElementById('hudNucleoBar').style.width = '0%';
+    }
+}
+
+function updateUI() {
+    if (!activeCell) return;
+}
+
+function showInspectorSidebar(show) {
+}
+
+function updateCamera() {
+    if (activeCell) {
+        let targetX = activeCell.x - app.screen.width / 2;
+        let targetY = activeCell.y - app.screen.height / 2;
+
+        const smoothFactor = 0.05;
+        camera.x += (targetX - camera.x) * smoothFactor;
+        camera.y += (targetY - camera.y) * smoothFactor;
+
+    } else {
+        const edgeSize = 50;
+        const speed = 15;
+
+        if (mouse.x < edgeSize) camera.x -= speed;
+        if (mouse.x > app.screen.width - edgeSize) camera.x += speed;
+        if (mouse.y < edgeSize) camera.y -= speed;
+        if (mouse.y > app.screen.height - edgeSize) camera.y += speed;
+    }
+
+    if (isNaN(camera.x) || isNaN(camera.y)) {
+        console.error("CAMERA IS NAN!", camera);
+        camera.x = 0;
+        camera.y = 0;
+    }
+
+    camera.x = Math.max(0, Math.min(camera.x, worldWidth - app.screen.width));
+    camera.y = Math.max(0, Math.min(camera.y, worldHeight - app.screen.height));
+}
+
+function gameLoop(deltaTime) {
+    if (isPaused) return;
+
+    const width = app.screen.width;
+    const height = app.screen.height;
+
+    if (activeCell) {
+        const input = {
+            up: keys['w'] || keys['arrowup'],
+            down: keys['s'] || keys['arrowdown'],
+            left: keys['a'] || keys['arrowleft'],
+            right: keys['d'] || keys['arrowright'],
+            space: keys[' '],
+            e: keys['e'],
+            r: keys['r'],
+            m: keys['m']
+        };
+
+        const worldMouse = {
+            x: mouse.x + camera.x,
+            y: mouse.y + camera.y
+        };
+
+        updateGameTimer(deltaTime / 60);
+
+        activeCell.update(worldMouse, input, worldWidth, worldHeight, foodParticles, otherCells, height);
+
+        checkCollisions(activeCell);
+        handleDivision();
+
+        updateEnvironment(worldWidth, worldHeight, activeCell);
+        renderEnvironment(activeCell);
+
+        updateCamera();
+
+        if (window.setCameraPosition) {
+            window.setCameraPosition(-camera.x, -camera.y);
+        }
+    } else {
+        updateEnvironment(worldWidth, worldHeight, null);
+        renderEnvironment(null);
+        updateCamera();
+        if (window.setCameraPosition) window.setCameraPosition(-camera.x, -camera.y);
+    }
+
+    handleCellSwitch();
+
+    updateHUD();
+    drawMinimap();
+
+    if (godMode && activeCell) {
+        activeCell.atp = activeCell.maxAtp;
+        activeCell.aminoAcids = activeCell.maxAminoAcids;
+        activeCell.nucleotides = activeCell.maxNucleotides;
+    }
+}
+
+function drawMinimap() {
+    const miniCanvas = document.getElementById('minimapCanvas');
+    if (!miniCanvas) return;
+    const miniCtx = miniCanvas.getContext('2d');
+
+    miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+
+    const scale = miniCanvas.width / Math.max(worldWidth, worldHeight);
+
+    miniCtx.fillStyle = '#000';
+    miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
+
+    const mapW = worldWidth * scale;
+    const mapH = worldHeight * scale;
+    miniCtx.strokeStyle = '#333';
+    miniCtx.lineWidth = 1;
+    miniCtx.strokeRect(0, 0, mapW, mapH);
+
+    otherCells.forEach(cell => {
+        const cx = cell.x * scale;
+        const cy = cell.y * scale;
+        miniCtx.beginPath();
+        miniCtx.arc(cx, cy, 2, 0, Math.PI * 2);
+
+        if (!cell.alive) {
+            miniCtx.fillStyle = '#888';
+        } else if (cell.isBacillus) {
+            miniCtx.fillStyle = '#FFEB3B';
+        } else {
+            miniCtx.fillStyle = '#4CAF50';
+        }
+        miniCtx.fill();
+    });
+
+    if (activeCell) {
+        const px = activeCell.x * scale;
+        const py = activeCell.y * scale;
+        miniCtx.beginPath();
+        miniCtx.arc(px, py, 3, 0, Math.PI * 2);
+        miniCtx.fillStyle = '#4CAF50';
+        miniCtx.fill();
+        miniCtx.strokeStyle = '#FFF';
+        miniCtx.lineWidth = 1;
+        miniCtx.stroke();
+    }
+
+    miniCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    miniCtx.lineWidth = 1;
+    if (activeCell) {
+        const camX = activeCell.x - app.screen.width / 2;
+        const camY = activeCell.y - app.screen.height / 2;
+
+        const rectX = camX * scale;
+        const rectY = camY * scale;
+        const rectW = app.screen.width * scale;
+        const rectH = app.screen.height * scale;
+
+        miniCtx.strokeRect(rectX, rectY, rectW, rectH);
+    }
+}
