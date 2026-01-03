@@ -194,7 +194,9 @@ export class Cell {
 
         // Morphology Update
         // Use time or just a tick
-        this.morphology.update(1); // dt = 1 frame
+        // Speed affects phase update (Whip speed)
+        const morphDt = 0.2 + (this.currentSpeed * 2.0);
+        this.morphology.update(morphDt);
 
         // Endocytosis Animation
         if (this.engulfed) {

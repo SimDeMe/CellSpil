@@ -161,57 +161,65 @@ export class CellRenderer {
 }
 
 function drawFlagellum(g, cell, r, moveAngle) {
-    const tailLen = r * 3.0;
-    const segments = 40; // High res for smooth curves
-    const phase = cell.morphology.phase * 15; // Faster spin
+    // 1. Setup
+    const tailLen = r * 3.5;
+    const segments = 30;
+    // Phase comes from Cell.js (scaled by speed)
+    // We multiply less here because the dt in Cell.js is already scaled
+    const phase = cell.morphology.phase * 2.0;
 
-    // Orient opposite to movement
-    const angle = moveAngle + Math.PI;
+    const angle = moveAngle + Math.PI; // Trail behind
 
+    // Base position (on membrane)
     const startX = Math.cos(angle) * r;
     const startY = Math.sin(angle) * r;
 
-    // Perpendicular vectors for wave displacement
+    // Perpendicular vectors
     const perpX = Math.cos(angle + Math.PI/2);
     const perpY = Math.sin(angle + Math.PI/2);
 
-    // Draw 3 intertwined strands to simulate a 3D helical bundle
-    // Each strand has a slight phase offset
-    const strands = 3;
-    const bundleWidth = 6;
+    // 2. Draw Anchor (Membrane Protein)
+    // Small dark box/circle at the base
+    const anchorSize = 4;
+    g.beginPath();
+    // Draw centered at startX, startY
+    g.circle(startX, startY, anchorSize);
+    g.fill({ color: 0x555555 }); // Dark grey protein
 
-    for (let s = 0; s < strands; s++) {
-        const strandPhase = phase + (s * (Math.PI * 2 / strands));
+    // 3. Draw Whip (Tapered)
+    // We draw segment by segment to adjust line width (taper)
 
+    let prevX = startX;
+    let prevY = startY;
+
+    for (let i = 1; i <= segments; i++) {
+        const t = i / segments; // 0..1
+        const dist = t * tailLen;
+
+        // Base line
+        const bx = startX + Math.cos(angle) * dist;
+        const by = startY + Math.sin(angle) * dist;
+
+        // Whip Physics:
+        // Amplitude grows with distance (t) -> like a whip crack
+        // Frequency: ~2 full waves along length
+        // Phase moves wave OUTWARDS (-phase)
+        const wave = Math.sin(t * 10 - phase);
+        const amplitude = 5 + (t * 10); // 5 at base, 15 at tip
+
+        const px = bx + perpX * (wave * amplitude);
+        const py = by + perpY * (wave * amplitude);
+
+        // Draw Segment
         g.beginPath();
-        g.moveTo(startX, startY);
+        g.moveTo(prevX, prevY);
+        g.lineTo(px, py);
 
-        for (let i = 0; i <= segments; i++) {
-            const t = i / segments; // 0..1
-            const dist = t * tailLen;
+        // Taper Width: 4px at base -> 1px at tip
+        const width = 4 * (1 - t) + 1;
+        g.stroke({ width: width, color: 0xDDDDDD, cap: 'round' });
 
-            // Base line position
-            const bx = startX + Math.cos(angle) * dist;
-            const by = startY + Math.sin(angle) * dist;
-
-            // Taper: thinner at the tip
-            const taper = 1.0 - (t * 0.5);
-
-            // Wave Function: High frequency sine for corkscrew
-            // (i * 0.8) gives roughly 5-6 turns over 40 segments
-            const waveVal = Math.sin(i * 0.5 - strandPhase);
-
-            // Amplitude: Bundle width
-            const amplitude = bundleWidth * taper;
-
-            const px = bx + perpX * (waveVal * amplitude);
-            const py = by + perpY * (waveVal * amplitude);
-
-            g.lineTo(px, py);
-        }
-
-        // Draw strand
-        // Vary alpha to simulate depth? Or just simple strands
-        g.stroke({ width: 1.5, color: 0xDDDDDD, alpha: 0.6 });
+        prevX = px;
+        prevY = py;
     }
 }
