@@ -1,8 +1,5 @@
 
 import { Trait } from './Trait.js';
-import { Cell } from './Cell.js';
-import { addCellToEnvironment, removeCellFromEnvironment } from './Environment.js';
-import { setActiveCell } from './Player.js';
 
 export class CellDivisionTrait extends Trait {
     constructor() {
@@ -18,7 +15,8 @@ export class CellDivisionTrait extends Trait {
         // Start division
         this.state = 'elongation';
         this.progress = 0;
-        cell.isDividing = true; // Flag legacy logic if needed
+        cell.isDividing = true; // Flag for external logic
+        cell.isReadyToSplit = false;
     }
 
     update(cell, dt) {
@@ -53,59 +51,9 @@ export class CellDivisionTrait extends Trait {
             }
         }
         else if (this.state === 'separation') {
-            // Phase 3: Split
-            this.finalizeDivision(cell);
+            // Phase 3: Signal split to the engine
+            cell.isReadyToSplit = true;
             this.state = 'finished';
         }
-    }
-
-    finalizeDivision(parent) {
-        // Logic to spawn two new cells
-        // Offset along division axis (X axis local)
-        const offset = parent.morphology.radius * 0.8;
-
-        // Create Daughter 1
-        const d1 = new Cell(parent.x - offset, parent.y);
-        this.copyTraits(parent, d1);
-        d1.morphology.aspectRatio = 1.0;
-        d1.morphology.constriction = 0;
-        d1.radius = parent.minRadius; // Reset size
-        d1.updateMaxGrowth(); // Recalc stats
-
-        // Create Daughter 2
-        const d2 = new Cell(parent.x + offset, parent.y);
-        this.copyTraits(parent, d2);
-        d2.morphology.aspectRatio = 1.0;
-        d2.morphology.constriction = 0;
-        d2.radius = parent.minRadius;
-        d2.updateMaxGrowth();
-
-        // Transfer Resources (Split 50/50)
-        d1.atp = parent.atp / 2;
-        d2.atp = parent.atp / 2;
-        // ... other resources
-
-        // Add to World
-        addCellToEnvironment(d1);
-        addCellToEnvironment(d2);
-
-        // Handle Player
-        if (parent.isPlayer) {
-            d1.isPlayer = true;
-            setActiveCell(d1);
-            // Move camera etc handled by main loop tracking activeCell
-        }
-
-        // Remove Parent
-        parent.kill();
-        removeCellFromEnvironment(parent);
-    }
-
-    copyTraits(source, target) {
-        // Copy genes/traits
-        // Since Cell uses 'genes' object primarily for config:
-        target.genes = { ...source.genes };
-        // If there are dynamic traits not in genes, copy them here?
-        // Current system syncs traits from genes in updateMaxGrowth()
     }
 }

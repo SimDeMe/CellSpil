@@ -2,7 +2,7 @@
 import { Cell } from './Cell.js';
 import { Bacillus } from './Bacillus.js';
 import { GameConfig } from './GameConfig.js';
-import { activeCell } from './Player.js';
+import { activeCell, setActiveCell } from './Player.js';
 
 export const foodParticles = [];
 export const otherCells = [];
@@ -354,6 +354,16 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     // But 'gameStartTime' is in main.js.
     // Let's add a `spawnMegabacillus` function and call it from main.js when time matches.
 
+    // [NEW] Handle Division (Trait Signal)
+    if (activeCell && activeCell.isReadyToSplit) {
+        performSplit(activeCell);
+    }
+    for (let i = 0; i < otherCells.length; i++) {
+        if (otherCells[i].isReadyToSplit) {
+            performSplit(otherCells[i]);
+        }
+    }
+
     if (activeCell) {
         resolveCollisions(activeCell, otherCells);
     }
@@ -578,6 +588,75 @@ export function removeCellFromEnvironment(cellToRemove) {
 
 export function addCellToEnvironment(cellToAdd) {
     otherCells.push(cellToAdd);
+}
+
+export function performSplit(parent) {
+    // Logic to spawn two new cells (avoiding circular deps in Trait)
+    // Offset along division axis (X axis local)
+    const offset = parent.morphology.radius * 0.8;
+
+    // Helper to create copy
+    // Use parent.constructor to handle Bacillus subclassing
+    const createDaughter = (x, y) => {
+        // We use 'new parent.constructor'
+        // If Bacillus, it takes (x, y, isMega). We assume standard constructor sig for now.
+        // If parent was Mega, we should spawn Mega?
+        // Bacillus constructor: (x, y, isMega)
+
+        let d;
+        if (parent.isBacillus) {
+            d = new parent.constructor(x, y, parent.isMegabacillus);
+        } else {
+            d = new parent.constructor(x, y, false);
+        }
+
+        // Copy genes/traits
+        d.genes = { ...parent.genes };
+        d.updateMaxGrowth(); // Sync traits
+
+        // Reset Morphology
+        d.morphology.aspectRatio = 1.0;
+        d.morphology.constriction = 0;
+        d.radius = parent.minRadius;
+
+        // Resources (50%)
+        d.atp = parent.atp / 2;
+        d.aminoAcids = parent.aminoAcids / 2;
+        d.nucleotides = parent.nucleotides / 2;
+
+        return d;
+    };
+
+    const d1 = createDaughter(parent.x - offset, parent.y);
+    const d2 = createDaughter(parent.x + offset, parent.y);
+
+    // Add to World
+    addCellToEnvironment(d1);
+    addCellToEnvironment(d2);
+
+    // Handle Player Transfer
+    if (parent.isPlayer) {
+        d1.isPlayer = true;
+        // setActiveCell imports from Player.js (added to imports)
+        setActiveCell(d1);
+        // Ensure d1 is removed from otherCells (setActiveCell usually handles this if called correctly?
+        // setActiveCell sets activeCell reference. It does NOT remove from otherCells.
+        // But addCellToEnvironment adds to otherCells.
+        // So we should remove d1 from otherCells?
+        // Let's check setActiveCell logic.
+        // It just sets the pointer.
+        // Logic in handleCellSwitch: removeCellFromEnvironment(clicked); setActiveCell(clicked).
+        // So we must remove d1 from otherCells if we make it player.
+        removeCellFromEnvironment(d1);
+    }
+
+    // Kill Parent
+    parent.kill();
+    // If parent is in otherCells, remove it.
+    if (!parent.isPlayer) {
+        removeCellFromEnvironment(parent);
+    }
+    // If parent was activeCell, setActiveCell(d1) replaced it.
 }
 
 export function spawnSpecificFood(type, x, y) {
