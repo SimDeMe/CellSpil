@@ -8,6 +8,7 @@ import {
     Nucleus,
     Mitochondria
 } from './Trait.js';
+import { CellDivisionTrait } from './CellDivisionTrait.js';
 
 export class Cell {
     constructor(x, y, isPlayer = false) {
@@ -167,15 +168,11 @@ export class Cell {
     }
 
     startDivision() {
-        this.isDividing = true;
-        this.divisionTimer = 0;
+        // New Trait-based division
+        this.addTrait(new CellDivisionTrait());
     }
 
-    finalizeDivision() {
-        this.isDividing = false;
-        this.divisionTimer = 0;
-        return true;
-    }
+    // finalizeDivision is now handled by the Trait
 
     kill() {
         this.atp = 0;
@@ -184,12 +181,31 @@ export class Cell {
     }
 
     update(mouse, inputKeys, worldWidth, worldHeight, foodParticles, otherCells, viewHeight = 600) {
-        if (this.isDividing) {
-            this.divisionTimer++;
-            return;
+        // Update Traits
+        this.traits.forEach(t => t.update(this, 1));
+
+        // If dividing (via trait), we might want to skip movement logic?
+        // Check if DivisionTrait is active and in a state that blocks movement.
+        const dividing = this.traits.find(t => t.id === 'cell_division');
+        if (dividing && dividing.state !== 'finished') {
+            // Block movement during division?
+            // Original logic blocked update entirely.
+            // Let's allow update but block input/movement.
+            // Or just return to emulate old behavior:
+            // return;
+
+            // Better: Allow morphology update but skip movement.
+            // But 'morphology.update' is called below.
+            // Let's block movement only.
+        } else {
+            // Only update age if not dividing (or maybe always? old logic blocked it)
+            this.age++;
         }
 
-        this.age++;
+        if (dividing && dividing.state !== 'finished') {
+             // Skip movement inputs
+             inputKeys = {}; // Disable input
+        }
         this.isTakingDamage = false;
 
         // Morphology Update

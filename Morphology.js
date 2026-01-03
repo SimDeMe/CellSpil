@@ -12,6 +12,10 @@ export class Morphology {
         this.wobbleAmount = 2.0;
         this.roughness = 0; // 0 = smooth, >0 = bumpy surface
 
+        // Division params
+        this.constriction = 0; // 0..1 (0 = none, 1 = separated)
+        this.divisionAxis = 0; // Angle of division
+
         // Dynamic state
         this.phase = Math.random() * Math.PI * 2;
     }
@@ -42,6 +46,28 @@ export class Morphology {
                  Math.pow(Math.sin(angle) / ry, 2)
              );
              r = 1 / div;
+        }
+
+        // Division Constriction (Peanut Shape)
+        if (this.constriction > 0) {
+            // Angle relative to division axis
+            let da = angle - this.divisionAxis;
+            // Normalize to -PI..PI
+            while (da < -Math.PI) da += Math.PI * 2;
+            while (da > Math.PI) da -= Math.PI * 2;
+
+            // Indentation at PI/2 and -PI/2 (90 deg from axis)
+            // Function: r *= 1 - constriction * GaussianBell(at 90deg)
+            // Simpler: Cosine based indentation?
+            // 1 - constriction * |sin(da)| ? No, that pinches everywhere except axis.
+            // We want pinch ONLY at 90 deg.
+
+            // Use sin^2(da) -> 1 at 90, 0 at 0.
+            // r *= 1 - (constriction * 0.8) * Math.pow(Math.sin(da), 2);
+
+            // To make it look like two distinct circles, we need deep constriction.
+            const pinch = Math.pow(Math.sin(da), 2);
+            r *= (1 - this.constriction * 0.9 * pinch);
         }
 
         // Organic Wobble

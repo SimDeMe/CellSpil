@@ -52,7 +52,8 @@ export class CellRenderer {
                 const diff = angle - moveAngle;
                 const cos = Math.cos(diff);
 
-                if (speedFactor > 0.05) {
+                // Disable snail stretch if dividing (constriction > 0) to keep shape clean
+                if (speedFactor > 0.05 && m.constriction === 0) {
                     const stretch = speedFactor * 10;
 
                     // Smooth deformation function (Cardioid-like) to avoid sharp edges.
