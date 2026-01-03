@@ -619,10 +619,10 @@ export function performSplit(parent) {
         d.morphology.constriction = 0;
         d.radius = parent.minRadius;
 
-        // Resources (50%)
-        d.atp = parent.atp / 2;
-        d.aminoAcids = parent.aminoAcids / 2;
-        d.nucleotides = parent.nucleotides / 2;
+        // Resources (50% - Integers only)
+        d.atp = Math.floor(parent.atp / 2);
+        d.aminoAcids = Math.floor(parent.aminoAcids / 2);
+        d.nucleotides = Math.floor(parent.nucleotides / 2);
 
         return d;
     };
