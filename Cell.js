@@ -91,7 +91,10 @@ export class Cell {
             protease: false,
             highTorque: false,
             endocytosis: false,
-            gramPositive: false // New
+            gramPositive: false, // New
+            atpStorage: 0,       // Tier 3 (Level 0-5)
+            aminoStorage: 0,     // Tier 3 (Level 0-5)
+            nucleotideStorage: 0 // Tier 3 (Level 0-5)
         };
 
         // Proxy/Setter logic could go here, but for now we call updateMaxGrowth() which will sync traits
@@ -149,7 +152,13 @@ export class Cell {
         if (this.genes.highTorque) cost += GameConfig.Player.mutationCosts.highTorque;
         if (this.genes.endocytosis) cost += GameConfig.Player.mutationCosts.endocytosis;
 
-        this.maxAminoAcids = cost;
+        // Apply Storage Multipliers (Tier 3)
+        const atpMult = 1.0 + (this.genes.atpStorage || 0) * 0.1;
+        const aminoMult = 1.0 + (this.genes.aminoStorage || 0) * 0.1;
+        const nucleoMult = 1.0 + (this.genes.nucleotideStorage || 0) * 0.1;
+
+        this.maxAminoAcids = cost * aminoMult;
+        this.maxNucleotides = this.stats.maxNucleotides * nucleoMult;
 
         // Size Logic
         if (this.genes.megacytosis) {
@@ -165,7 +174,7 @@ export class Cell {
         }
 
         // Sync Stats to Legacy props
-        this.maxAtp = this.stats.maxAtp;
+        this.maxAtp = this.stats.maxAtp * atpMult;
         // speed is calculated per frame in update() usually, or baseSpeed mod.
     }
 

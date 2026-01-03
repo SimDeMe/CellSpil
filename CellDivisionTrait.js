@@ -27,9 +27,9 @@ export class CellDivisionTrait extends Trait {
 
         if (this.state === 'elongation') {
             // Phase 1: Elongation (0 -> 0.5)
-            // Stretch aspectRatio from 1.0 to 2.0
+            // Stretch aspectRatio from 1.0 to 2.2 (extra stretch for separation)
             const phaseT = Math.min(1, t * 2);
-            cell.morphology.aspectRatio = 1.0 + phaseT * 1.0; // Ends at 2.0
+            cell.morphology.aspectRatio = 1.0 + phaseT * 1.2; // Ends at 2.2
 
             // Slightly start constriction late in this phase
             if (phaseT > 0.8) {
@@ -41,7 +41,7 @@ export class CellDivisionTrait extends Trait {
             const phaseT = (t - 0.4) / 0.6; // Normalize remaining time
 
             // Ensure aspectRatio stays high
-            cell.morphology.aspectRatio = 2.0;
+            cell.morphology.aspectRatio = 2.2;
 
             // Ramp up constriction from 0 to 1
             cell.morphology.constriction = Math.max(0, Math.min(1, phaseT));

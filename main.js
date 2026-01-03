@@ -413,6 +413,18 @@ function showMutationPopup(mutationType, newCell = null) {
         title.innerText = "Ny Mutation: Endocytose!";
         desc.innerText = "Tier 4 (Apex). Du kan nu spise mindre celler!";
         cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.endocytosis} Aminosyrer.`;
+    } else if (mutationType === 'atpStorage') {
+        title.innerText = "Ny Mutation: ATP Lager!";
+        desc.innerText = "Tier 3. Øger max ATP med 10%. Kan stackes.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.atpStorage} Aminosyrer.`;
+    } else if (mutationType === 'aminoStorage') {
+        title.innerText = "Ny Mutation: Aminosyre Lager!";
+        desc.innerText = "Tier 3. Øger max Aminosyrer med 10%. Kan stackes.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.aminoStorage} Aminosyrer.`;
+    } else if (mutationType === 'nucleotideStorage') {
+        title.innerText = "Ny Mutation: Nukleotid Lager!";
+        desc.innerText = "Tier 3. Øger max Nukleotider med 10%. Kan stackes.";
+        cost.innerText = `PRIS: +${GameConfig.Player.mutationCosts.nucleotideStorage} Aminosyrer.`;
     }
 
     // AUTO-SWITCH: Hvis vi har fået en ny celle, skift til den!
@@ -808,7 +820,9 @@ function renderMutationsTab() {
 
     // Helper til at lave items
     const addItem = (key, name, desc) => {
-        const hasGene = genes[key];
+        const val = genes[key];
+        const hasGene = (typeof val === 'number') ? val > 0 : !!val;
+
         const item = document.createElement('div');
         item.className = `mutation-item ${hasGene ? 'unlocked' : 'locked'}`;
 
@@ -816,9 +830,15 @@ function renderMutationsTab() {
         icon.className = 'icon';
         icon.innerText = hasGene ? '✅' : '🔒';
 
+        // Format name with level if applicable
+        let displayName = name;
+        if (typeof val === 'number' && val > 0) {
+            displayName += ` (Lvl ${val})`;
+        }
+
         const info = document.createElement('div');
         info.className = 'info';
-        info.innerHTML = `<strong>${name}</strong><br><span style="font-size:0.8em; color:#aaa;">${desc}</span>`;
+        info.innerHTML = `<strong>${displayName}</strong><br><span style="font-size:0.8em; color:#aaa;">${desc}</span>`;
 
         item.appendChild(icon);
         item.appendChild(info);
@@ -840,6 +860,11 @@ function renderMutationsTab() {
     addItem('multiplexPili', 'Multiplex Pili', 'Bedre pili rækkevidde.');
     addItem('highTorque', 'High-Torque Flagel', 'Hurtigere bevægelse.');
     addItem('highSpeedRetraction', 'High-Speed Retraction', 'Hurtigere pili træk.');
+
+    // Tier 3 Storage
+    addItem('atpStorage', 'ATP Lager', '+10% Max ATP per level (Max 5).');
+    addItem('aminoStorage', 'Aminosyre Lager', '+10% Max Aminosyrer per level (Max 5).');
+    addItem('nucleotideStorage', 'Nukleotid Lager', '+10% Max Nukleotider per level (Max 5).');
 
     // Tier 4
     addItem('endocytosis', 'Endocytosis', 'Spis mindre celler direkte.');
@@ -980,7 +1005,9 @@ function renderCellsTab() {
         dnaDetail.style.display = 'none';
 
         btnDna.onclick = () => {
-            if (dnaDetail.style.display === 'none') {
+            const isHidden = dnaDetail.style.display === 'none' || dnaDetail.classList.contains('hidden');
+            if (isHidden) {
+                dnaDetail.classList.remove('hidden');
                 dnaDetail.style.display = 'block';
                 // Styles
                 dnaDetail.style.background = '#222';
@@ -991,13 +1018,11 @@ function renderCellsTab() {
                 dnaDetail.style.fontSize = '0.85em';
                 dnaDetail.style.border = '1px solid #444';
 
-                // Debug
-                console.log("Inspecting Cell Genes (Raw):", cell.genes);
-
                 // Build list from keys
                 const active = [];
                 for (const key in cell.genes) {
-                    if (cell.genes[key]) {
+                    const val = cell.genes[key];
+                    if (val) {
                         // Manual formatting map
                         let name = key;
                         if (key === 'flagellum') name = 'Flagellum';
@@ -1010,6 +1035,10 @@ function renderCellsTab() {
                         else if (key === 'highTorque') name = 'High Torque';
                         else if (key === 'highSpeedRetraction') name = 'High Speed Retraction';
                         else if (key === 'multiplexPili') name = 'Multiplex Pili';
+
+                        if (typeof val === 'number') {
+                            name += ` (Lvl ${val})`;
+                        }
 
                         active.push("• " + name);
                     }

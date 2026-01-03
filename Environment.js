@@ -549,6 +549,12 @@ export function attemptMutation(cell) {
             }
             if (!g.megacytosis) possibleMutations.push('megacytosis');
 
+            // Storage Upgrades (Stackable)
+            const caps = GameConfig.Player.mutationCaps;
+            if (g.atpStorage < caps.atpStorage) possibleMutations.push('atpStorage');
+            if (g.aminoStorage < caps.aminoStorage) possibleMutations.push('aminoStorage');
+            if (g.nucleotideStorage < caps.nucleotideStorage) possibleMutations.push('nucleotideStorage');
+
             // TIER 4
             if (g.megacytosis && !g.endocytosis) {
                 possibleMutations.push('endocytosis');
@@ -557,8 +563,15 @@ export function attemptMutation(cell) {
 
         if (possibleMutations.length > 0) {
             const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
-            cell.genes[newMutation] = true;
-            mutated = true; // Unused var but good for tracking
+
+            // Handle Stackable vs Boolean
+            if (typeof cell.genes[newMutation] === 'number') {
+                cell.genes[newMutation]++;
+            } else {
+                cell.genes[newMutation] = true;
+            }
+
+            mutated = true;
 
             console.log("MUTATION ON ACTIVE CELL! New gene: " + newMutation);
 

@@ -26,7 +26,15 @@ export const GameConfig = {
             endocytosis: 8,
             highSpeedRetraction: 4, // [NEW] Upgrade for Pili
             multiplexPili: 6,       // [NEW] Upgrade for Pili
-            gramPositive: 4         // [NEW] Toxin Resistance (Cell Wall)
+            gramPositive: 4,        // [NEW] Toxin Resistance (Cell Wall)
+            atpStorage: 5,          // Tier 3 (+10% Max ATP)
+            aminoStorage: 5,        // Tier 3 (+10% Max Amino)
+            nucleotideStorage: 5    // Tier 3 (+10% Max Nucleo)
+        },
+        mutationCaps: {
+            atpStorage: 5,
+            aminoStorage: 5,
+            nucleotideStorage: 5
         },
         upkeep: {
             base: 0,
