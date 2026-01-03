@@ -161,39 +161,57 @@ export class CellRenderer {
 }
 
 function drawFlagellum(g, cell, r, moveAngle) {
-    const tailLen = r * 2.5;
-    const segments = 10;
-    const phase = cell.morphology.phase * 5;
+    const tailLen = r * 3.0;
+    const segments = 40; // High res for smooth curves
+    const phase = cell.morphology.phase * 15; // Faster spin
 
     // Orient opposite to movement
-    // moveAngle is direction of travel. Tail is at moveAngle + PI.
     const angle = moveAngle + Math.PI;
 
-    g.beginPath();
-
-    // Start at body edge
     const startX = Math.cos(angle) * r;
     const startY = Math.sin(angle) * r;
-    g.moveTo(startX, startY);
 
-    // Draw tail
-    for (let i = 0; i <= segments; i++) {
-        const dist = (i/segments) * tailLen;
-        // Base line
-        const bx = startX + Math.cos(angle) * dist;
-        const by = startY + Math.sin(angle) * dist;
+    // Perpendicular vectors for wave displacement
+    const perpX = Math.cos(angle + Math.PI/2);
+    const perpY = Math.sin(angle + Math.PI/2);
 
-        // Wave offset (perpendicular)
-        const perpX = Math.cos(angle + Math.PI/2);
-        const perpY = Math.sin(angle + Math.PI/2);
+    // Draw 3 intertwined strands to simulate a 3D helical bundle
+    // Each strand has a slight phase offset
+    const strands = 3;
+    const bundleWidth = 6;
 
-        const wave = Math.sin(i + phase) * 5;
+    for (let s = 0; s < strands; s++) {
+        const strandPhase = phase + (s * (Math.PI * 2 / strands));
 
-        const px = bx + perpX * wave;
-        const py = by + perpY * wave;
+        g.beginPath();
+        g.moveTo(startX, startY);
 
-        g.lineTo(px, py);
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments; // 0..1
+            const dist = t * tailLen;
+
+            // Base line position
+            const bx = startX + Math.cos(angle) * dist;
+            const by = startY + Math.sin(angle) * dist;
+
+            // Taper: thinner at the tip
+            const taper = 1.0 - (t * 0.5);
+
+            // Wave Function: High frequency sine for corkscrew
+            // (i * 0.8) gives roughly 5-6 turns over 40 segments
+            const waveVal = Math.sin(i * 0.5 - strandPhase);
+
+            // Amplitude: Bundle width
+            const amplitude = bundleWidth * taper;
+
+            const px = bx + perpX * (waveVal * amplitude);
+            const py = by + perpY * (waveVal * amplitude);
+
+            g.lineTo(px, py);
+        }
+
+        // Draw strand
+        // Vary alpha to simulate depth? Or just simple strands
+        g.stroke({ width: 1.5, color: 0xDDDDDD, alpha: 0.6 });
     }
-
-    g.stroke({ width: 2, color: 0xAAAAAA });
 }
