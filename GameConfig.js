@@ -58,7 +58,9 @@ export const GameConfig = {
         speed: 0.5,
         maxAtp: 150,
         passiveDecay: 0.01,
-        populationCap: 50
+        populationCap: 50,
+        initialSpawnTime: 60, // Seconds (1 minute)
+        spawnInterval: 60 // Seconds (1 per minute)
     },
     Megabacillus: {
         spawnTime: 30000, // 30 sekunder (DEBUG TEST TID, ellers 300000 = 5 min)

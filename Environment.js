@@ -11,11 +11,21 @@ const crunchSound = new Audio('sounds/Crunch.mp3');
 
 const maxFood = GameConfig.World.foodMax;
 let spawnTimer = 0;
+let bacillusTimer = 0;
+let bacillusSpawned = false;
 
 let onMutationCallback = null;
+let onEventCallback = null;
 
 export function setMutationCallback(callback) {
     onMutationCallback = callback;
+}
+export function setEventCallback(callback) {
+    onEventCallback = callback;
+}
+
+export function setMute(muted) {
+    crunchSound.muted = muted;
 }
 
 // Helper for Pixi Sync
@@ -334,6 +344,19 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
         spawnTimer = 0;
     }
 
+    // Bacillus Spawning
+    bacillusTimer++;
+    const initialTime = (GameConfig.Bacillus.initialSpawnTime || 60) * 60;
+    const interval = (GameConfig.Bacillus.spawnInterval || 60) * 60;
+
+    if (!bacillusSpawned && bacillusTimer >= initialTime) {
+        bacillusSpawned = true;
+        spawnBacillus(canvasWidth, canvasHeight);
+        if (onEventCallback) onEventCallback("Advarsel!", "Bacillus Observert!", "Fjende Ankommet");
+    } else if (bacillusSpawned && (bacillusTimer - initialTime) % interval === 0) {
+        spawnBacillus(canvasWidth, canvasHeight);
+    }
+
     updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
     updateProteaseParticles(canvasWidth, canvasHeight); // Protease Update
     updateDangerZones(canvasWidth, canvasHeight); // [NEW]
@@ -615,6 +638,14 @@ export function performSplit(parent) {
     // Offset along division axis (X axis local)
     const offset = parent.morphology.radius * 0.8;
 
+    // CALCULATE RESOURCES [NEW]
+    let divCost = { amino: 3, nucleotide: 3 };
+    if (parent.getDivisionCost) divCost = parent.getDivisionCost();
+
+    const pAmino = Math.max(0, parent.aminoAcids - divCost.amino);
+    const pNucleo = Math.max(0, parent.nucleotides - divCost.nucleotide);
+    const pAtp = parent.atp;
+
     // Helper to create copy
     // Use parent.constructor to handle Bacillus subclassing
     const createDaughter = (x, y) => {
@@ -639,10 +670,10 @@ export function performSplit(parent) {
         d.morphology.constriction = 0;
         d.radius = parent.minRadius;
 
-        // Resources (50% - Integers only)
-        d.atp = Math.floor(parent.atp / 2);
-        d.aminoAcids = Math.floor(parent.aminoAcids / 2);
-        d.nucleotides = Math.floor(parent.nucleotides / 2);
+        // Resources (50% of Remaining)
+        d.atp = Math.floor(pAtp / 2);
+        d.aminoAcids = Math.floor(pAmino / 2);
+        d.nucleotides = Math.floor(pNucleo / 2);
 
         return d;
     };

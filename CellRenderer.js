@@ -92,6 +92,12 @@ export class CellRenderer {
                 const t = sec.timer / 30; // 0..1
                 dist = r * 0.2 * t;
                 radius = (r * 0.1) + (r * 0.2 * t);
+            } else if (sec.state === 'ready') {
+                // Floating Pulse (Waiting for trigger)
+                const pulse = Math.sin(Date.now() / 200) * 0.05;
+                dist = r * 0.2;
+                radius = (r * 0.3) * (1 + pulse);
+                alpha = 0.9;
             } else {
                 // Moving/Releasing (30 -> 40)
                 const t = (sec.timer - 30) / 10; // 0..1
