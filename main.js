@@ -187,13 +187,13 @@ function setupProductionUI() {
 
     const btnToxin = document.createElement('button');
     btnToxin.id = 'btnToxin';
-    btnToxin.innerText = "[1] Synthesize Toxin (15 ATP, 1 Amino)";
+    btnToxin.innerText = "[1] Synthesize Toxin (Release: E)";
     styleBtn(btnToxin, '#00E676');
     btnToxin.onclick = () => { if (activeCell) activeCell.produce('toxin'); };
 
     const btnEnzyme = document.createElement('button');
     btnEnzyme.id = 'btnEnzyme';
-    btnEnzyme.innerText = "[2] Synthesize Enzyme (10 ATP, 1 Amino)";
+    btnEnzyme.innerText = "[2] Synthesize Enzyme (Release: R)";
     styleBtn(btnEnzyme, '#E91E63');
     btnEnzyme.onclick = () => { if (activeCell) activeCell.produce('protease'); };
 
@@ -641,7 +641,7 @@ function renderMutationsTab() {
 
     addItem('atpStorage', 'ATP Lager', '+10% Max ATP per level (Max 5).');
     addItem('aminoStorage', 'Aminosyre Lager', '+10% Max Aminosyrer per level (Max 5).');
-    addItem('nucleotideStorage', 'Nukleotid Lager', '+10% Max Nukleotider per level (Max 5).');
+    // addItem('nucleotideStorage', 'Nukleotid Lager', '+10% Max Nukleotider per level (Max 5).'); // Removed
 
     addItem('endocytosis', 'Endocytosis', 'Spis mindre celler direkte.');
     addItem('gramPositive', 'Gram Positive', 'Tyk cellevæg (Defense).');
@@ -905,6 +905,29 @@ function updateHUD() {
         if (document.getElementById('hudAtpBar')) document.getElementById('hudAtpBar').style.width = '0%';
         if (document.getElementById('hudAminoBar')) document.getElementById('hudAminoBar').style.width = '0%';
         if (document.getElementById('hudNucleoBar')) document.getElementById('hudNucleoBar').style.width = '0%';
+    }
+
+    // Raw Materials Display
+    let rawContainer = document.getElementById('hudRaw');
+    if (!rawContainer) {
+        const hudContent = document.querySelector('.hud-content');
+        if (hudContent) {
+            rawContainer = document.createElement('div');
+            rawContainer.id = 'hudRaw';
+            rawContainer.style.marginTop = '10px';
+            rawContainer.style.fontSize = '0.9em';
+            rawContainer.style.color = '#AAA';
+            hudContent.appendChild(rawContainer);
+        }
+    }
+
+    if (rawContainer && activeCell) {
+        rawContainer.innerHTML = `
+            <strong>Raw Materials:</strong><br>
+            C: ${Math.floor(activeCell.carbon || 0)} <span style="color:#FFEB3B">●</span>
+            N: ${Math.floor(activeCell.nitrogen || 0)} <span style="color:#2196F3">■</span>
+            P: ${Math.floor(activeCell.phosphate || 0)} <span style="color:#F44336">■</span>
+        `;
     }
 }
 

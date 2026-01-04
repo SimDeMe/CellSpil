@@ -710,12 +710,17 @@ export function performSplit(parent) {
 }
 
 export function spawnSpecificFood(type, x, y) {
+    // Map legacy types
+    if (type === 'glucose') type = 'carbon';
+    if (type === 'amino') type = 'nitrogen';
+    if (type === 'nucleotide') type = 'phosphate';
+
     const particle = {
         x: x,
         y: y,
-        type: type, // 'glucose', 'amino', 'nucleotide'
-        radius: (type === 'glucose') ? 3 : 4,
-        color: (type === 'glucose') ? '#FFEB3B' : (type === 'amino' ? '#2196F3' : '#F44336'),
+        type: type,
+        radius: (type === 'carbon') ? 3 : 4,
+        color: (type === 'carbon') ? '#FFEB3B' : (type === 'nitrogen' ? '#2196F3' : '#F44336'),
         driftAngle: Math.random() * Math.PI * 2,
         vx: 0,
         vy: 0
@@ -767,12 +772,12 @@ export function spawnClumpedFood(mapWidth, mapHeight, totalCount) {
 
 function spawnRandomFoodAt(x, y) {
     const typeRandom = Math.random();
-    let type = 'glucose';
+    let type = 'carbon';
 
     if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
-        type = 'nucleotide';
+        type = 'phosphate';
     } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
-        type = 'amino';
+        type = 'nitrogen';
     }
 
     spawnSpecificFood(type, x, y);
@@ -783,20 +788,20 @@ export function spawnFood(width, height) {
     let particle = {
         x: Math.random() * width,
         y: Math.random() * height,
-        type: 'glucose',
+        type: 'carbon',
         radius: 3,
-        color: '#FFEB3B',
+        color: '#FFEB3B', // Yellow
         driftAngle: Math.random() * Math.PI * 2, // Start vinkel
         vx: 0,
         vy: 0
     };
 
     if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
-        particle.type = 'nucleotide';
+        particle.type = 'phosphate';
         particle.color = '#F44336'; // Red
         particle.radius = 4;
     } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
-        particle.type = 'amino';
+        particle.type = 'nitrogen';
         particle.color = '#2196F3'; // Blue
         particle.radius = 4;
     }
@@ -819,10 +824,10 @@ export function drawEnvironment(ctx) {
     // Draw Food
     foodParticles.forEach(food => {
         ctx.beginPath();
-        if (food.type === 'glucose') {
+        if (food.type === 'carbon' || food.type === 'glucose') {
             ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
         } else {
-            // Amino (Blue) & Nucleotides (Cyan) are squares
+            // Nitrogen/Amino & Phosphate/Nucleotides are squares
             ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
         }
         ctx.fillStyle = food.color;
@@ -872,13 +877,12 @@ export function checkCollisions(cell) {
                 crunchSound.play().catch(e => console.log("Audio play failed:", e));
             }
 
-            if (food.type === 'glucose') {
-                cell.atp = Math.min(cell.atp + GameConfig.Resources.glucoseEnergy, cell.maxAtp);
-            } else if (food.type === 'amino') {
-                cell.aminoAcids = Math.min(cell.aminoAcids + GameConfig.Resources.aminoValue, cell.maxAminoAcids);
-            } else if (food.type === 'nucleotide') {
-                // [NEW]
-                cell.nucleotides = Math.min(cell.nucleotides + GameConfig.Resources.nucleotideValue, cell.maxNucleotides);
+            if (food.type === 'glucose' || food.type === 'carbon') {
+                if (cell.carbon !== undefined) cell.carbon += GameConfig.Resources.carbonValue;
+            } else if (food.type === 'amino' || food.type === 'nitrogen') {
+                if (cell.nitrogen !== undefined) cell.nitrogen += GameConfig.Resources.nitrogenValue;
+            } else if (food.type === 'nucleotide' || food.type === 'phosphate') {
+                if (cell.phosphate !== undefined) cell.phosphate += GameConfig.Resources.phosphateValue;
             }
         }
     }

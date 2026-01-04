@@ -36,11 +36,18 @@ export class Cell {
 
         this.atp = this.stats.maxAtp;
         this.maxAtp = this.stats.maxAtp;
+
+        // Refined Resources
         this.aminoAcids = 0;
         this.maxAminoAcids = this.stats.maxAmino;
         this.nucleotides = 0;
         this.baseMaxNucleotides = this.stats.maxNucleotides;
         this.maxNucleotides = this.stats.maxNucleotides;
+
+        // Raw Materials (Metabolism)
+        this.carbon = 0;
+        this.nitrogen = 0;
+        this.phosphate = 0;
 
         this.alive = true;
         this.age = 0;
@@ -139,10 +146,11 @@ export class Cell {
 
         const atpMult = 1.0 + (this.genes.atpStorage || 0) * 0.1;
         const aminoMult = 1.0 + (this.genes.aminoStorage || 0) * 0.1;
-        const nucleoMult = 1.0 + (this.genes.nucleotideStorage || 0) * 0.1;
 
         this.maxAminoAcids = cost * aminoMult;
-        this.maxNucleotides = this.stats.maxNucleotides * nucleoMult;
+        // Nucleotides cap matches division cost exactly (dynamic)
+        const divCost = this.getDivisionCost();
+        this.maxNucleotides = divCost.nucleotide;
 
         if (this.genes.megacytosis) {
             this.size = 2;
@@ -226,6 +234,8 @@ export class Cell {
         }
 
         this.isTakingDamage = false;
+
+        this.metabolize();
 
         const morphDt = 0.2 + (this.currentSpeed * 2.0);
         this.morphology.update(morphDt);
@@ -411,6 +421,50 @@ export class Cell {
         // this.atp = Math.floor(this.atp);
         // this.aminoAcids = Math.floor(this.aminoAcids);
         // this.nucleotides = Math.floor(this.nucleotides);
+    }
+
+    metabolize() {
+        const rates = GameConfig.Resources;
+
+        // 1. Fermentation (Carbon -> ATP)
+        // Trickle conversion
+        if (this.carbon > 0) {
+            const amount = Math.min(this.carbon, rates.fermentationRate);
+            this.carbon -= amount;
+            this.atp = Math.min(this.atp + amount * rates.fermentationYield, this.maxAtp);
+        }
+
+        // 2. Synthesis (Amino Acids)
+        // Needs C + N + ATP
+        if (this.aminoAcids < this.maxAminoAcids) {
+            const cost = rates.synthesisCost.amino;
+            if (this.carbon >= cost.carbon && this.nitrogen >= cost.nitrogen && this.atp >= cost.atp) {
+                // Synthesize 1 Amino (Takes 1 tick? Or instant if resources match?)
+                // Let's make it probability based or throttle it to avoid instant drain
+                // For now, instant per tick (1 per tick is fast, maybe too fast)
+                if (Math.random() < 0.1) { // 10% chance per tick to synthesize
+                    this.carbon -= cost.carbon;
+                    this.nitrogen -= cost.nitrogen;
+                    this.atp -= cost.atp;
+                    this.aminoAcids++;
+                }
+            }
+        }
+
+        // 3. Synthesis (Nucleotides)
+        // Needs C + N + P + ATP
+        if (this.nucleotides < this.maxNucleotides) {
+            const cost = rates.synthesisCost.nucleotide;
+            if (this.carbon >= cost.carbon && this.nitrogen >= cost.nitrogen && this.phosphate >= cost.phosphate && this.atp >= cost.atp) {
+                if (Math.random() < 0.1) {
+                    this.carbon -= cost.carbon;
+                    this.nitrogen -= cost.nitrogen;
+                    this.phosphate -= cost.phosphate;
+                    this.atp -= cost.atp;
+                    this.nucleotides++;
+                }
+            }
+        }
     }
 
     draw(g) {
