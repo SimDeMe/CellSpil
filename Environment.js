@@ -878,7 +878,7 @@ export function checkCollisions(cell) {
             }
 
             if (food.type === 'glucose' || food.type === 'carbon') {
-                if (cell.carbon !== undefined) cell.carbon += GameConfig.Resources.carbonValue;
+                if (cell.glucose !== undefined) cell.glucose += GameConfig.Resources.carbonValue;
             } else if (food.type === 'amino' || food.type === 'nitrogen') {
                 if (cell.nitrogen !== undefined) cell.nitrogen += GameConfig.Resources.nitrogenValue;
             } else if (food.type === 'nucleotide' || food.type === 'phosphate') {
@@ -924,10 +924,10 @@ export function resolveCollisions(player, others) {
                     c2.engulfed = true;
                     c2.engulfedBy = c1;
 
-                    // Giv ressourcer med det samme (kun én gang da vi ignorerer engulfed i loopet fremover)
+                    // Giv ressourcer (Endocytose Reward)
                     c1.atp += 20;
-                    c1.aminoAcids += 1;
-                    c1.nucleotides += 1;
+                    c1.storedProtein += 5; // Meat
+                    c1.storedDna += 2; // Genetic material
                     eaten = true;
                     console.log("Endocytose: C1 spiste C2 (Animation Started)");
                 }
@@ -937,8 +937,8 @@ export function resolveCollisions(player, others) {
                     c1.engulfedBy = c2;
 
                     c2.atp += 20;
-                    c2.aminoAcids += 1;
-                    c2.nucleotides += 1;
+                    c2.storedProtein += 5;
+                    c2.storedDna += 2;
                     eaten = true;
                     console.log("Endocytose: C2 spiste C1 (Animation Started)");
                 }

@@ -862,6 +862,82 @@ function setupInspectorModal() {
     });
 }
 
+function renderKatabolismeTab() {
+    const container = document.getElementById('katabolismeContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!activeCell) return;
+
+    const addBtn = (label, action, enabled) => {
+        const btn = document.createElement('button');
+        btn.innerText = label;
+        btn.className = 'action-btn';
+        btn.disabled = !enabled;
+        btn.style.width = '100%';
+        btn.style.marginBottom = '10px';
+        if (!enabled) btn.style.opacity = 0.5;
+
+        btn.onclick = () => {
+            if (action()) updateInspectorContent();
+        };
+        container.appendChild(btn);
+    };
+
+    addBtn(
+        `Breakdown Glucose (1 ATP -> 6 C) [Stock: ${Math.floor(activeCell.glucose)}]`,
+        () => activeCell.catabolizeGlucose(),
+        activeCell.glucose >= 1 && activeCell.atp >= 1
+    );
+
+    addBtn(
+        `Breakdown Protein (1 ATP -> 3 Amino) [Stock: ${activeCell.storedProtein}]`,
+        () => activeCell.catabolizeProtein(),
+        activeCell.storedProtein >= 1 && activeCell.atp >= 1
+    );
+
+    addBtn(
+        `Breakdown DNA (2 ATP -> 3 Nucleo) [Stock: ${activeCell.storedDna}]`,
+        () => activeCell.catabolizeDna(),
+        activeCell.storedDna >= 1 && activeCell.atp >= 2
+    );
+}
+
+function renderAnabolismeTab() {
+    const container = document.getElementById('anabolismeContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!activeCell) return;
+
+    const addBtn = (label, action, enabled) => {
+        const btn = document.createElement('button');
+        btn.innerText = label;
+        btn.className = 'action-btn';
+        btn.disabled = !enabled;
+        btn.style.width = '100%';
+        btn.style.marginBottom = '10px';
+        if (!enabled) btn.style.opacity = 0.5;
+
+        btn.onclick = () => {
+            if (action()) updateInspectorContent();
+        };
+        container.appendChild(btn);
+    };
+
+    addBtn(
+        `Synthesize Amino (4C, 1N, 1ATP)`,
+        () => activeCell.anabolizeAmino(),
+        activeCell.carbon >= 4 && activeCell.nitrogen >= 1 && activeCell.atp >= 1
+    );
+
+    addBtn(
+        `Synthesize Nucleotide (10C, 3N, 1P, 5ATP)`,
+        () => activeCell.anabolizeNucleotide(),
+        activeCell.carbon >= 10 && activeCell.nitrogen >= 3 && activeCell.phosphate >= 1 && activeCell.atp >= 5
+    );
+}
+
 function updateHUD() {
     document.getElementById('hudGen').innerText = generation;
     const pop = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);

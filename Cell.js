@@ -45,9 +45,14 @@ export class Cell {
         this.maxNucleotides = this.stats.maxNucleotides;
 
         // Raw Materials (Metabolism)
-        this.carbon = 0;
+        this.glucose = 0; // External Carbon Source
+        this.carbon = 0;  // Internal C-atoms (from Catabolism)
         this.nitrogen = 0;
         this.phosphate = 0;
+
+        // Complex Stores (from Predation)
+        this.storedDna = 0;
+        this.storedProtein = 0;
 
         this.alive = true;
         this.age = 0;
@@ -426,45 +431,75 @@ export class Cell {
     metabolize() {
         const rates = GameConfig.Resources;
 
-        // 1. Fermentation (Carbon -> ATP)
-        // Trickle conversion
-        if (this.carbon > 0) {
-            const amount = Math.min(this.carbon, rates.fermentationRate);
-            this.carbon -= amount;
+        // 1. Fermentation (Glucose -> ATP)
+        // Glycolysis + Fermentation: 2 ATP per Glucose
+        if (this.glucose > 0) {
+            const amount = Math.min(this.glucose, rates.fermentationRate);
+            this.glucose -= amount;
             this.atp = Math.min(this.atp + amount * rates.fermentationYield, this.maxAtp);
         }
+    }
 
-        // 2. Synthesis (Amino Acids)
-        // Needs C + N + ATP
-        if (this.aminoAcids < this.maxAminoAcids) {
-            const cost = rates.synthesisCost.amino;
-            if (this.carbon >= cost.carbon && this.nitrogen >= cost.nitrogen && this.atp >= cost.atp) {
-                // Synthesize 1 Amino (Takes 1 tick? Or instant if resources match?)
-                // Let's make it probability based or throttle it to avoid instant drain
-                // For now, instant per tick (1 per tick is fast, maybe too fast)
-                if (Math.random() < 0.1) { // 10% chance per tick to synthesize
-                    this.carbon -= cost.carbon;
-                    this.nitrogen -= cost.nitrogen;
-                    this.atp -= cost.atp;
-                    this.aminoAcids++;
-                }
-            }
-        }
+    // --- KATABOLISME (Breakdown) ---
 
-        // 3. Synthesis (Nucleotides)
-        // Needs C + N + P + ATP
-        if (this.nucleotides < this.maxNucleotides) {
-            const cost = rates.synthesisCost.nucleotide;
-            if (this.carbon >= cost.carbon && this.nitrogen >= cost.nitrogen && this.phosphate >= cost.phosphate && this.atp >= cost.atp) {
-                if (Math.random() < 0.1) {
-                    this.carbon -= cost.carbon;
-                    this.nitrogen -= cost.nitrogen;
-                    this.phosphate -= cost.phosphate;
-                    this.atp -= cost.atp;
-                    this.nucleotides++;
-                }
-            }
+    catabolizeGlucose() {
+        // 1 Glucose + 1 ATP -> 6 Carbon
+        if (this.glucose >= 1 && this.atp >= 1) {
+            this.glucose -= 1;
+            this.atp -= 1;
+            this.carbon += 6;
+            return true;
         }
+        return false;
+    }
+
+    catabolizeProtein() {
+        // 1 Protein + 1 ATP -> 3 Amino Acids
+        if (this.storedProtein >= 1 && this.atp >= 1) {
+            this.storedProtein -= 1;
+            this.atp -= 1;
+            this.aminoAcids = Math.min(this.aminoAcids + 3, this.maxAminoAcids);
+            return true;
+        }
+        return false;
+    }
+
+    catabolizeDna() {
+        // 1 DNA + 2 ATP -> 3 Nucleotides
+        if (this.storedDna >= 1 && this.atp >= 2) {
+            this.storedDna -= 1;
+            this.atp -= 2;
+            this.nucleotides = Math.min(this.nucleotides + 3, this.maxNucleotides);
+            return true;
+        }
+        return false;
+    }
+
+    // --- ANABOLISME (Synthesis) ---
+
+    anabolizeAmino() {
+        // 4 C + 1 N + 1 ATP -> 1 Amino Acid
+        if (this.carbon >= 4 && this.nitrogen >= 1 && this.atp >= 1 && this.aminoAcids < this.maxAminoAcids) {
+            this.carbon -= 4;
+            this.nitrogen -= 1;
+            this.atp -= 1;
+            this.aminoAcids += 1;
+            return true;
+        }
+        return false;
+    }
+
+    anabolizeNucleotide() {
+        // 10 C + 3 N + 1 P + 5 ATP -> 1 Nucleotide
+        if (this.carbon >= 10 && this.nitrogen >= 3 && this.phosphate >= 1 && this.atp >= 5 && this.nucleotides < this.maxNucleotides) {
+            this.carbon -= 10;
+            this.nitrogen -= 3;
+            this.phosphate -= 1;
+            this.atp -= 5;
+            this.nucleotides += 1;
+            return true;
+        }
+        return false;
     }
 
     draw(g) {
