@@ -73,12 +73,7 @@ let gameTimer = 0;
 let isMuted = false;
 
 // --- NEW UI SYSTEMS ---
-setupDebugSystem();
-setupPauseSystem();
-setupResetSystem();
-setupTimerSystem();
-setupProductionUI();
-setupMuteButton();
+// Systems are initialized in init()
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
@@ -817,7 +812,7 @@ function setupInspectorModal() {
         closeBtn.onclick = () => {
             isInspecting = false;
             modal.classList.add('hidden');
-            togglePause();
+            toggleGlobalPause();
         };
     }
 
