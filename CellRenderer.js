@@ -74,39 +74,48 @@ export class CellRenderer {
 
         g.fill({ color: color, alpha: 0.8 });
 
-        // --- 2.5 SECRETION VESICLE ---
-        if (cell.secretion && cell.secretion.state !== 'idle') {
+        // --- 2.5 SECRETION & VESICLES ---
+
+        // A. Stored Vesicles
+        if (cell.vesicles && cell.vesicles.length > 0) {
+            const vCount = cell.vesicles.length;
+            const ringRadius = r * 0.5;
+
+            cell.vesicles.forEach((type, i) => {
+                const angle = (i / 5) * Math.PI * 2; // Fixed slots for 5 max
+                const vx = Math.cos(angle) * ringRadius;
+                const vy = Math.sin(angle) * ringRadius;
+
+                const vColor = (type === 'toxin') ? 0x00E676 : 0xE91E63;
+
+                g.circle(vx, vy, r * 0.15);
+                g.fill({ color: vColor });
+                g.stroke({ width: 1, color: 0xFFFFFF });
+            });
+        }
+
+        // B. Production Animation (Growing in center)
+        if (cell.production && cell.production.state === 'producing') {
+            const t = cell.production.timer / cell.production.maxTimer;
+            const pRadius = (r * 0.1) * t;
+            const pColor = (cell.production.type === 'toxin') ? 0x00E676 : 0xE91E63;
+
+            g.circle(0, 0, pRadius);
+            g.fill({ color: pColor, alpha: 0.7 });
+            g.stroke({ width: 1, color: 0xFFFFFF, alpha: 0.7 });
+        }
+
+        // C. Release Animation (Moving out)
+        if (cell.secretion && cell.secretion.state === 'releasing') {
             const sec = cell.secretion;
-            // Direction: Use moveAngle (Cell front)
-            // We draw in local space, so angle relative to body is just moveAngle?
-            // No, body is 0 rotation. So global moveAngle is the direction vector in local space too.
+            const t = sec.timer / sec.maxTimer;
+
             const dir = moveAngle;
+            const dist = (r * 0.5) + (r * 0.6 * t); // Start from ring, move out
+            const radius = r * 0.2;
+            const alpha = 1.0 - (t * 0.5);
 
-            let dist = 0;
-            let radius = r * 0.3;
-            let alpha = 0.9;
             const color = (sec.type === 'toxin') ? 0x00E676 : 0xE91E63;
-
-            if (sec.state === 'forming') {
-                // Grow from center
-                const t = sec.timer / 30; // 0..1
-                dist = r * 0.2 * t;
-                radius = (r * 0.1) + (r * 0.2 * t);
-            } else if (sec.state === 'ready') {
-                // Floating Pulse (Waiting for trigger)
-                const pulse = Math.sin(Date.now() / 200) * 0.05;
-                dist = r * 0.2;
-                radius = (r * 0.3) * (1 + pulse);
-                alpha = 0.9;
-            } else {
-                // Moving/Releasing (30 -> 40)
-                const t = (sec.timer - 30) / 10; // 0..1
-                // Move from inner (0.2r) to edge (r)
-                dist = (r * 0.2) + (r * 0.8 * t);
-
-                // Merge effect?
-                if (t > 0.5) alpha = 1.0 - (t - 0.5); // Fade out as it bursts?
-            }
 
             const vx = Math.cos(dir) * dist;
             const vy = Math.sin(dir) * dist;

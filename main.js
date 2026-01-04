@@ -81,9 +81,9 @@ window.addEventListener('keydown', (e) => {
     }
     // Shortcuts for Production
     if (e.key === '1') {
-        if (activeCell) activeCell.produce('toxin');
+        if (activeCell && activeCell.genes.toxin) activeCell.produce('toxin');
     } else if (e.key === '2') {
-        if (activeCell) activeCell.produce('protease');
+        if (activeCell && activeCell.genes.protease) activeCell.produce('protease');
     }
 });
 
@@ -186,17 +186,49 @@ function setupProductionUI() {
     };
 
     const btnToxin = document.createElement('button');
+    btnToxin.id = 'btnToxin';
     btnToxin.innerText = "[1] Synthesize Toxin (15 ATP, 1 Amino)";
     styleBtn(btnToxin, '#00E676');
     btnToxin.onclick = () => { if (activeCell) activeCell.produce('toxin'); };
 
     const btnEnzyme = document.createElement('button');
+    btnEnzyme.id = 'btnEnzyme';
     btnEnzyme.innerText = "[2] Synthesize Enzyme (10 ATP, 1 Amino)";
     styleBtn(btnEnzyme, '#E91E63');
     btnEnzyme.onclick = () => { if (activeCell) activeCell.produce('protease'); };
 
     container.appendChild(btnToxin);
     container.appendChild(btnEnzyme);
+}
+
+function updateProductionButtons() {
+    if (!activeCell) return;
+    const btnToxin = document.getElementById('btnToxin');
+    const btnEnzyme = document.getElementById('btnEnzyme');
+
+    if (btnToxin) {
+        if (activeCell.genes.toxin) {
+            btnToxin.disabled = false;
+            btnToxin.style.opacity = '1';
+            btnToxin.style.filter = 'none';
+        } else {
+            btnToxin.disabled = true;
+            btnToxin.style.opacity = '0.5';
+            btnToxin.style.filter = 'grayscale(100%)';
+        }
+    }
+
+    if (btnEnzyme) {
+        if (activeCell.genes.protease) {
+            btnEnzyme.disabled = false;
+            btnEnzyme.style.opacity = '1';
+            btnEnzyme.style.filter = 'none';
+        } else {
+            btnEnzyme.disabled = true;
+            btnEnzyme.style.opacity = '0.5';
+            btnEnzyme.style.filter = 'grayscale(100%)';
+        }
+    }
 }
 
 function updateGameTimer(dt) {
@@ -878,6 +910,7 @@ function updateHUD() {
 
 function updateUI() {
     if (!activeCell) return;
+    updateProductionButtons();
 }
 
 function showInspectorSidebar(show) {
@@ -960,7 +993,9 @@ function gameLoop(deltaTime) {
 
     handleCellSwitch();
 
+    if (activeCell) window.activeCell = activeCell; // Expose for testing
     updateHUD();
+    updateUI(); // [FIX] Update Production UI
     drawMinimap();
 
     if (godMode && activeCell) {
@@ -979,8 +1014,8 @@ function handleDivision() {
     if (!activeCell) return;
     if (activeCell.isDividing) return;
 
-    // Trigger division if 'f' is pressed and resources are sufficient
-    if (keys['f']) {
+    // Trigger division if 'm' is pressed and resources are sufficient
+    if (keys['m']) {
         const cost = activeCell.getDivisionCost();
         if (activeCell.aminoAcids >= cost.amino && activeCell.nucleotides >= cost.nucleotide) {
             activeCell.startDivision();
