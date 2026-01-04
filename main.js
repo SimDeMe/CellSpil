@@ -970,6 +970,11 @@ function gameLoop(deltaTime) {
     }
 }
 
+function handleCellSwitch() {
+    // Logic to switch cells if needed (e.g., via hotkey or auto-switch on death)
+    // Currently handled via UI or automatic logic in Environment.js
+}
+
 function handleDivision() {
     if (!activeCell) return;
     if (activeCell.isDividing) return;
