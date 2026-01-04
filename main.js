@@ -927,7 +927,8 @@ function gameLoop(deltaTime) {
             space: keys[' '],
             e: keys['e'],
             r: keys['r'],
-            m: keys['m']
+            m: keys['m'],
+            f: keys['f']
         };
 
         const worldMouse = {
@@ -966,6 +967,19 @@ function gameLoop(deltaTime) {
         activeCell.atp = activeCell.maxAtp;
         activeCell.aminoAcids = activeCell.maxAminoAcids;
         activeCell.nucleotides = activeCell.maxNucleotides;
+    }
+}
+
+function handleDivision() {
+    if (!activeCell) return;
+    if (activeCell.isDividing) return;
+
+    // Trigger division if 'f' is pressed and resources are sufficient
+    if (keys['f']) {
+        const cost = activeCell.getDivisionCost();
+        if (activeCell.aminoAcids >= cost.amino && activeCell.nucleotides >= cost.nucleotide) {
+            activeCell.startDivision();
+        }
     }
 }
 

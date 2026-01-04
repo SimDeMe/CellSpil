@@ -1,34 +1,26 @@
 from playwright.sync_api import sync_playwright
 
-def verify_frontend():
+def verify_game_load():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         try:
             # Navigate to the game
-            page.goto("http://localhost:8080")
+            page.goto("http://localhost:8080/index.html")
 
-            # Wait for the canvas to be ready (Game container)
-            page.wait_for_selector("#game-container")
+            # Wait for the canvas to be present (game initialized)
+            page.wait_for_selector("canvas", state="visible")
 
-            # Wait a bit for the game to start and player to spawn
-            page.wait_for_timeout(3000)
+            # Wait for HUD elements to check if UI is loaded
+            page.wait_for_selector("#gameHUD", state="visible")
+            page.wait_for_selector("#hudGen", state="visible")
 
-            # Click the Debug button to open menu
-            debug_btn = page.get_by_role("button", name="DEBUG")
-            if debug_btn.is_visible():
-                debug_btn.click()
-                page.wait_for_timeout(500)
-
-                # Toggle "Megacytosis" to see size change
-                mega_chk = page.locator("#debug_mut_megacytosis")
-                if mega_chk.is_visible():
-                    mega_chk.check()
-                    page.wait_for_timeout(500)
+            # Wait a bit to ensure no immediate crash
+            page.wait_for_timeout(2000)
 
             # Take a screenshot
-            page.screenshot(path="/home/jules/verification/game_screen.png")
-            print("Screenshot taken at /home/jules/verification/game_screen.png")
+            page.screenshot(path="verification/game_load.png")
+            print("Screenshot taken: verification/game_load.png")
 
         except Exception as e:
             print(f"Error: {e}")
@@ -36,4 +28,4 @@ def verify_frontend():
             browser.close()
 
 if __name__ == "__main__":
-    verify_frontend()
+    verify_game_load()
