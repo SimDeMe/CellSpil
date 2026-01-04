@@ -394,10 +394,10 @@ export class Cell {
 
         if (this.atp <= 0) this.kill();
 
-        // Integer Enforcement
-        this.atp = Math.floor(this.atp);
-        this.aminoAcids = Math.floor(this.aminoAcids);
-        this.nucleotides = Math.floor(this.nucleotides);
+        // Integer Enforcement - Removed to allow fractional drain
+        // this.atp = Math.floor(this.atp);
+        // this.aminoAcids = Math.floor(this.aminoAcids);
+        // this.nucleotides = Math.floor(this.nucleotides);
     }
 
     draw(g) {
