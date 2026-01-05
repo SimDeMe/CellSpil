@@ -10,9 +10,10 @@ export const GameConfig = {
     Player: {
         baseSpeed: 2,
         maxAtp: 100,
-        baseMaxAmino: 3,
-        baseMaxNucleotides: 3, // [NEW] DNA byggesten
-        moveCost: 0.001,
+        baseMaxAmino: 6, // [UPDATED] Max 6
+        baseMaxNucleotides: 6, // [UPDATED] Max 6
+        divisionCost: { amino: 3, nucleotide: 3 }, // [NEW] Explicit division cost
+        moveCost: 0.0001, // [UPDATED] 10% of previous (0.001 -> 0.0001)
         mutationRate: 1.0,
         backMutationRate: 0.0,
         mutationCosts: {
@@ -25,7 +26,14 @@ export const GameConfig = {
             endocytosis: 8,
             highSpeedRetraction: 4, // [NEW] Upgrade for Pili
             multiplexPili: 6,       // [NEW] Upgrade for Pili
-            gramPositive: 4         // [NEW] Toxin Resistance (Cell Wall)
+            gramPositive: 4,        // [NEW] Toxin Resistance (Cell Wall)
+            atpStorage: 5,          // Tier 3 (+10% Max ATP)
+            aminoStorage: 5         // Tier 3 (+10% Max Amino)
+            // nucleotideStorage removed
+        },
+        mutationCaps: {
+            atpStorage: 5,
+            aminoStorage: 5
         },
         upkeep: {
             base: 0,
@@ -49,7 +57,9 @@ export const GameConfig = {
         speed: 0.5,
         maxAtp: 150,
         passiveDecay: 0.01,
-        populationCap: 50
+        populationCap: 50,
+        initialSpawnTime: 60, // Seconds (1 minute)
+        spawnInterval: 60 // Seconds (1 per minute)
     },
     Megabacillus: {
         spawnTime: 30000, // 30 sekunder (DEBUG TEST TID, ellers 300000 = 5 min)
@@ -63,9 +73,23 @@ export const GameConfig = {
         }
     },
     Resources: {
-        glucoseEnergy: 20,
-        aminoValue: 1,
-        nucleotideValue: 1 // [NEW] Værdi pr. klump
+        glucoseEnergy: 0, // Removed instant energy
+        aminoValue: 0,
+        nucleotideValue: 0,
+
+        // Raw Materials
+        carbonValue: 1,
+        nitrogenValue: 1,
+        phosphateValue: 1,
+
+        // Metabolism Rates
+        fermentationRate: 0.05, // Carbon -> ATP per tick
+        fermentationYield: 0.5, // ATP per Carbon unit (consumed slowly)
+
+        synthesisCost: {
+            amino: { carbon: 1, nitrogen: 1, atp: 5 },
+            nucleotide: { carbon: 1, nitrogen: 1, phosphate: 1, atp: 10 }
+        }
     },
     SpawnRates: {
         aminoThreshold: 0.6,      // Hvis random > 0.8 -> Amino

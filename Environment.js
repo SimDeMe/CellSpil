@@ -11,11 +11,21 @@ const crunchSound = new Audio('sounds/Crunch.mp3');
 
 const maxFood = GameConfig.World.foodMax;
 let spawnTimer = 0;
+let bacillusTimer = 0;
+let bacillusSpawned = false;
 
 let onMutationCallback = null;
+let onEventCallback = null;
 
 export function setMutationCallback(callback) {
     onMutationCallback = callback;
+}
+export function setEventCallback(callback) {
+    onEventCallback = callback;
+}
+
+export function setMute(muted) {
+    crunchSound.muted = muted;
 }
 
 // Helper for Pixi Sync
@@ -122,37 +132,44 @@ export const dangerZones = []; // [NEW] Environmental Hazards
 let dangerZoneSpawnTimer = 0;
 let nextZoneSpawnTime = 600; // Start fast for debug/first spawn
 
-export function spawnToxinPulse(x, y) {
+export function spawnToxinPulse(x, y, dir = 0) {
     console.log("Environment: Spawning Toxin at", x, y);
-    // Spawn 20 partikler i en cirkel
-    for (let i = 0; i < 20; i++) {
-        const angle = (Math.PI * 2 / 20) * i;
+    // Spawn 50 particles (Organic burst)
+    for (let i = 0; i < 50; i++) {
+        // Directional burst with spread (cone)
+        const spread = (Math.random() - 0.5) * 2.0; // +/- 1 radian (~60 deg)
+        const angle = dir + spread;
+        const speed = 2 + Math.random() * 3;
+
         toxinParticles.push({
             x: x,
             y: y,
-            vx: Math.cos(angle) * 3, // Hurtig spredning
-            vy: Math.sin(angle) * 3,
-            life: 120, // 2 sekunder ved 60fps
-            maxLife: 120,
-            type: 'toxin', // VISUAL HELPER
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 180,
+            maxLife: 180,
+            type: 'toxin',
             color: '#00E676'
         });
     }
 }
 
-export function spawnProteasePulse(x, y) {
+export function spawnProteasePulse(x, y, dir = 0) {
     console.log("Environment: Spawning Protease at", x, y);
-    // Proteaser spredes langsommere men lever længere
-    for (let i = 0; i < 24; i++) {
-        const angle = (Math.PI * 2 / 24) * i;
+    // 50 particles
+    for (let i = 0; i < 50; i++) {
+        const spread = (Math.random() - 0.5) * 2.0;
+        const angle = dir + spread;
+        const speed = 1.5 + Math.random() * 2.5;
+
         proteaseParticles.push({
             x: x,
             y: y,
-            vx: Math.cos(angle) * 1.5,
-            vy: Math.sin(angle) * 1.5,
-            life: 180, // 3 sekunder
-            maxLife: 180,
-            type: 'protease', // VISUAL HELPER
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 240,
+            maxLife: 240,
+            type: 'protease',
             color: '#E91E63'
         });
     }
@@ -325,6 +342,19 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
     if (spawnTimer > GameConfig.World.foodSpawnRate && foodParticles.length < maxFood) {
         spawnFood(canvasWidth, canvasHeight);
         spawnTimer = 0;
+    }
+
+    // Bacillus Spawning
+    bacillusTimer++;
+    const initialTime = (GameConfig.Bacillus.initialSpawnTime || 60) * 60;
+    const interval = (GameConfig.Bacillus.spawnInterval || 60) * 60;
+
+    if (!bacillusSpawned && bacillusTimer >= initialTime) {
+        bacillusSpawned = true;
+        spawnBacillus(canvasWidth, canvasHeight);
+        if (onEventCallback) onEventCallback("Advarsel!", "Bacillus Observert!", "Fjende Ankommet");
+    } else if (bacillusSpawned && (bacillusTimer - initialTime) % interval === 0) {
+        spawnBacillus(canvasWidth, canvasHeight);
     }
 
     updateToxinParticles(canvasWidth, canvasHeight); // Toxin Update
@@ -542,6 +572,12 @@ export function attemptMutation(cell) {
             }
             if (!g.megacytosis) possibleMutations.push('megacytosis');
 
+            // Storage Upgrades (Stackable)
+            const caps = GameConfig.Player.mutationCaps;
+            if (g.atpStorage < caps.atpStorage) possibleMutations.push('atpStorage');
+            if (g.aminoStorage < caps.aminoStorage) possibleMutations.push('aminoStorage');
+            if (g.nucleotideStorage < caps.nucleotideStorage) possibleMutations.push('nucleotideStorage');
+
             // TIER 4
             if (g.megacytosis && !g.endocytosis) {
                 possibleMutations.push('endocytosis');
@@ -550,8 +586,15 @@ export function attemptMutation(cell) {
 
         if (possibleMutations.length > 0) {
             const newMutation = possibleMutations[Math.floor(Math.random() * possibleMutations.length)];
-            cell.genes[newMutation] = true;
-            mutated = true; // Unused var but good for tracking
+
+            // Handle Stackable vs Boolean
+            if (typeof cell.genes[newMutation] === 'number') {
+                cell.genes[newMutation]++;
+            } else {
+                cell.genes[newMutation] = true;
+            }
+
+            mutated = true;
 
             console.log("MUTATION ON ACTIVE CELL! New gene: " + newMutation);
 
@@ -595,6 +638,14 @@ export function performSplit(parent) {
     // Offset along division axis (X axis local)
     const offset = parent.morphology.radius * 0.8;
 
+    // CALCULATE RESOURCES [NEW]
+    let divCost = { amino: 3, nucleotide: 3 };
+    if (parent.getDivisionCost) divCost = parent.getDivisionCost();
+
+    const pAmino = Math.max(0, parent.aminoAcids - divCost.amino);
+    const pNucleo = Math.max(0, parent.nucleotides - divCost.nucleotide);
+    const pAtp = parent.atp;
+
     // Helper to create copy
     // Use parent.constructor to handle Bacillus subclassing
     const createDaughter = (x, y) => {
@@ -619,10 +670,10 @@ export function performSplit(parent) {
         d.morphology.constriction = 0;
         d.radius = parent.minRadius;
 
-        // Resources (50% - Integers only)
-        d.atp = Math.floor(parent.atp / 2);
-        d.aminoAcids = Math.floor(parent.aminoAcids / 2);
-        d.nucleotides = Math.floor(parent.nucleotides / 2);
+        // Resources (50% of Remaining)
+        d.atp = Math.floor(pAtp / 2);
+        d.aminoAcids = Math.floor(pAmino / 2);
+        d.nucleotides = Math.floor(pNucleo / 2);
 
         return d;
     };
@@ -639,16 +690,15 @@ export function performSplit(parent) {
         d1.isPlayer = true;
         // setActiveCell imports from Player.js (added to imports)
         setActiveCell(d1);
-        // Ensure d1 is removed from otherCells (setActiveCell usually handles this if called correctly?
-        // setActiveCell sets activeCell reference. It does NOT remove from otherCells.
-        // But addCellToEnvironment adds to otherCells.
-        // So we should remove d1 from otherCells?
-        // Let's check setActiveCell logic.
-        // It just sets the pointer.
-        // Logic in handleCellSwitch: removeCellFromEnvironment(clicked); setActiveCell(clicked).
-        // So we must remove d1 from otherCells if we make it player.
+        // Transfer Action Callback
+        d1.onAction = parent.onAction;
+        // Ensure d1 is removed from otherCells
         removeCellFromEnvironment(d1);
     }
+
+    // Attempt Mutation on Daughters
+    attemptMutation(d1);
+    attemptMutation(d2);
 
     // Kill Parent
     parent.kill();
@@ -660,12 +710,17 @@ export function performSplit(parent) {
 }
 
 export function spawnSpecificFood(type, x, y) {
+    // Map legacy types
+    if (type === 'glucose') type = 'carbon';
+    if (type === 'amino') type = 'nitrogen';
+    if (type === 'nucleotide') type = 'phosphate';
+
     const particle = {
         x: x,
         y: y,
-        type: type, // 'glucose', 'amino', 'nucleotide'
-        radius: (type === 'glucose') ? 3 : 4,
-        color: (type === 'glucose') ? '#FFEB3B' : (type === 'amino' ? '#2196F3' : '#F44336'),
+        type: type,
+        radius: (type === 'carbon') ? 3 : 4,
+        color: (type === 'carbon') ? '#FFEB3B' : (type === 'nitrogen' ? '#2196F3' : '#F44336'),
         driftAngle: Math.random() * Math.PI * 2,
         vx: 0,
         vy: 0
@@ -717,12 +772,12 @@ export function spawnClumpedFood(mapWidth, mapHeight, totalCount) {
 
 function spawnRandomFoodAt(x, y) {
     const typeRandom = Math.random();
-    let type = 'glucose';
+    let type = 'carbon';
 
     if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
-        type = 'nucleotide';
+        type = 'phosphate';
     } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
-        type = 'amino';
+        type = 'nitrogen';
     }
 
     spawnSpecificFood(type, x, y);
@@ -733,20 +788,20 @@ export function spawnFood(width, height) {
     let particle = {
         x: Math.random() * width,
         y: Math.random() * height,
-        type: 'glucose',
+        type: 'carbon',
         radius: 3,
-        color: '#FFEB3B',
+        color: '#FFEB3B', // Yellow
         driftAngle: Math.random() * Math.PI * 2, // Start vinkel
         vx: 0,
         vy: 0
     };
 
     if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
-        particle.type = 'nucleotide';
+        particle.type = 'phosphate';
         particle.color = '#F44336'; // Red
         particle.radius = 4;
     } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
-        particle.type = 'amino';
+        particle.type = 'nitrogen';
         particle.color = '#2196F3'; // Blue
         particle.radius = 4;
     }
@@ -769,10 +824,10 @@ export function drawEnvironment(ctx) {
     // Draw Food
     foodParticles.forEach(food => {
         ctx.beginPath();
-        if (food.type === 'glucose') {
+        if (food.type === 'carbon' || food.type === 'glucose') {
             ctx.arc(food.x, food.y, food.radius, 0, Math.PI * 2);
         } else {
-            // Amino (Blue) & Nucleotides (Cyan) are squares
+            // Nitrogen/Amino & Phosphate/Nucleotides are squares
             ctx.rect(food.x - food.radius, food.y - food.radius, food.radius * 2, food.radius * 2);
         }
         ctx.fillStyle = food.color;
@@ -822,13 +877,12 @@ export function checkCollisions(cell) {
                 crunchSound.play().catch(e => console.log("Audio play failed:", e));
             }
 
-            if (food.type === 'glucose') {
-                cell.atp = Math.min(cell.atp + GameConfig.Resources.glucoseEnergy, cell.maxAtp);
-            } else if (food.type === 'amino') {
-                cell.aminoAcids = Math.min(cell.aminoAcids + GameConfig.Resources.aminoValue, cell.maxAminoAcids);
-            } else if (food.type === 'nucleotide') {
-                // [NEW]
-                cell.nucleotides = Math.min(cell.nucleotides + GameConfig.Resources.nucleotideValue, cell.maxNucleotides);
+            if (food.type === 'glucose' || food.type === 'carbon') {
+                if (cell.glucose !== undefined) cell.glucose += GameConfig.Resources.carbonValue;
+            } else if (food.type === 'amino' || food.type === 'nitrogen') {
+                if (cell.nitrogen !== undefined) cell.nitrogen += GameConfig.Resources.nitrogenValue;
+            } else if (food.type === 'nucleotide' || food.type === 'phosphate') {
+                if (cell.phosphate !== undefined) cell.phosphate += GameConfig.Resources.phosphateValue;
             }
         }
     }
@@ -870,10 +924,10 @@ export function resolveCollisions(player, others) {
                     c2.engulfed = true;
                     c2.engulfedBy = c1;
 
-                    // Giv ressourcer med det samme (kun én gang da vi ignorerer engulfed i loopet fremover)
+                    // Giv ressourcer (Endocytose Reward)
                     c1.atp += 20;
-                    c1.aminoAcids += 1;
-                    c1.nucleotides += 1;
+                    c1.storedProtein += 5; // Meat
+                    c1.storedDna += 2; // Genetic material
                     eaten = true;
                     console.log("Endocytose: C1 spiste C2 (Animation Started)");
                 }
@@ -883,8 +937,8 @@ export function resolveCollisions(player, others) {
                     c1.engulfedBy = c2;
 
                     c2.atp += 20;
-                    c2.aminoAcids += 1;
-                    c2.nucleotides += 1;
+                    c2.storedProtein += 5;
+                    c2.storedDna += 2;
                     eaten = true;
                     console.log("Endocytose: C2 spiste C1 (Animation Started)");
                 }

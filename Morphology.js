@@ -29,43 +29,38 @@ export class Morphology {
      * @param {number} angle
      */
     getRadiusAt(angle) {
-        if (this.shapeType === 'circle' && this.wobbleAmount === 0) return this.radius;
+        // Handle Aspect Ratio (Elongation with constant area)
+        // Treat as ellipse aligned with divisionAxis
+        let da = angle - this.divisionAxis;
 
-        // Base Radius
-        let r = this.radius;
+        let a = this.radius;
+        let b = this.radius;
 
-        // Shape modifiers
+        if (this.aspectRatio > 1.0) {
+            // Constant Area: a*b = r*r. a/b = AR.
+            // a = r * sqrt(AR), b = r / sqrt(AR)
+            const sqrtAR = Math.sqrt(this.aspectRatio);
+            a = this.radius * sqrtAR;
+            b = this.radius / sqrtAR;
+        }
+
+        // Ellipse Radius Formula: r = ab / sqrt( (b cos theta)^2 + (a sin theta)^2 )
+        const denom = Math.sqrt(Math.pow(b * Math.cos(da), 2) + Math.pow(a * Math.sin(da), 2));
+        let r = (a * b) / denom;
+
+        // Shape modifiers (Legacy Rod override if needed, but above covers elongation)
         if (this.shapeType === 'rod') {
-             // Simplified rod approximation for radial lookup (ellipse-ish)
-             // Real rod drawing handles this via drawing rect+caps
-             const rx = this.radius * this.aspectRatio;
-             const ry = this.radius;
-             // Ellipse formula
-             const div = Math.sqrt(
-                 Math.pow(Math.cos(angle) / rx, 2) +
-                 Math.pow(Math.sin(angle) / ry, 2)
-             );
-             r = 1 / div;
+             // For strict 'rod' type we might use the rect approximation, but here we update the radial lookup
+             // to match the ellipse logic which is smoother for deformations.
         }
 
         // Division Constriction (Peanut Shape)
         if (this.constriction > 0) {
-            // Angle relative to division axis
-            let da = angle - this.divisionAxis;
-            // Normalize to -PI..PI
+            // Normalize da to -PI..PI
             while (da < -Math.PI) da += Math.PI * 2;
             while (da > Math.PI) da -= Math.PI * 2;
 
-            // Indentation at PI/2 and -PI/2 (90 deg from axis)
-            // Function: r *= 1 - constriction * GaussianBell(at 90deg)
-            // Simpler: Cosine based indentation?
-            // 1 - constriction * |sin(da)| ? No, that pinches everywhere except axis.
-            // We want pinch ONLY at 90 deg.
-
-            // Use sin^2(da) -> 1 at 90, 0 at 0.
-            // r *= 1 - (constriction * 0.8) * Math.pow(Math.sin(da), 2);
-
-            // To make it look like two distinct circles, we need deep constriction.
+            // Indentation at 90 deg from axis
             const pinch = Math.pow(Math.sin(da), 2);
             r *= (1 - this.constriction * 0.9 * pinch);
         }
