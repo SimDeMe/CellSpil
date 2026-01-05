@@ -592,6 +592,10 @@ function updateInspectorContent() {
         renderMetabolismTab();
     } else if (activeTabId === 'tabCells') {
         renderCellsTab();
+    } else if (activeTabId === 'tabKatabolisme') {
+        renderKatabolismeTab();
+    } else if (activeTabId === 'tabAnabolisme') {
+        renderAnabolismeTab();
     }
 }
 
@@ -690,11 +694,22 @@ function renderMetabolismTab() {
     createStat("Nukleotider (DNA)", activeCell.nucleotides, activeCell.maxNucleotides, '#E040FB');
 
     const details = document.createElement('div');
+    const atpSurplus = activeCell.atp >= (activeCell.maxAtp * 0.9);
+    const rateText = atpSurplus ?
+        "<span style='color:orange'>Inhibited (ATP High)</span>" :
+        "<span style='color:#00E676'>Active</span>";
+
     details.innerHTML = `
-        <h3 style="margin-top:20px; border-bottom:1px solid #444; padding-bottom:5px;">Stats</h3>
-        <p>Speed: <span style="color:#fff">${activeCell.genes.flagellum ? "High" : "Low"}</span></p>
-        <p>Defense: <span style="color:#fff">${activeCell.genes.gramPositive ? "High" : "Normal"}</span></p>
-        <p>Diet: <span style="color:#fff">Omnivore (Altædende)</span></p>
+        <h3 style="margin-top:20px; border-bottom:1px solid #444; padding-bottom:5px;">Metabolism Details</h3>
+        <p><strong>Glycolysis & Fermentation:</strong> ${rateText}</p>
+        <p style="font-size:0.9em; color:#aaa;">Converts Glucose -> ATP automatically when ATP is low.</p>
+
+        <div style="margin-top:10px; padding:10px; background:#1a1a1a; border-radius:5px;">
+           <div><strong>Glucose (Yellow):</strong> Energy source.</div>
+           <div><strong>Carbon (White):</strong> Backbone for Amino Acids.</div>
+           <div><strong>Nitrogen (Blue):</strong> Required for Amino/DNA.</div>
+           <div><strong>Phosphate (Red):</strong> Required for DNA/ATP.</div>
+        </div>
     `;
     container.appendChild(details);
 }
@@ -955,12 +970,14 @@ function updateHUD() {
     }
 
     if (activeCell) {
+        // ATP
         const atpPct = (activeCell.atp / activeCell.maxAtp) * 100;
         const atpBar = document.getElementById('hudAtpBar');
         if (atpBar) atpBar.style.width = atpPct + '%';
         const atpVal = document.getElementById('hudAtpVal');
         if (atpVal) atpVal.innerText = `${Math.floor(activeCell.atp)} / ${activeCell.maxAtp}`;
 
+        // Amino
         const divCost = GameConfig.Player.divisionCost;
         const aminoPct = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 100;
         const aminoBar = document.getElementById('hudAminoBar');
@@ -968,11 +985,44 @@ function updateHUD() {
         const aminoVal = document.getElementById('hudAminoVal');
         if (aminoVal) aminoVal.innerText = `${activeCell.aminoAcids} / ${activeCell.maxAminoAcids} (Div: ${divCost.amino})`;
 
+        // Nucleotides
         const nucleoPct = (activeCell.nucleotides / activeCell.maxNucleotides) * 100;
         const nucleoBar = document.getElementById('hudNucleoBar');
         if (nucleoBar) nucleoBar.style.width = nucleoPct + '%';
         const nucleoVal = document.getElementById('hudNucleoVal');
         if (nucleoVal) nucleoVal.innerText = `${activeCell.nucleotides} / ${activeCell.maxNucleotides} (Div: ${divCost.nucleotide})`;
+
+        // Glucose
+        const glcMax = activeCell.maxGlucose || 100;
+        const glcPct = (activeCell.glucose / glcMax) * 100;
+        const glcBar = document.getElementById('hudGlucoseBar');
+        if (glcBar) glcBar.style.width = glcPct + '%';
+        const glcVal = document.getElementById('hudGlucoseVal');
+        if (glcVal) glcVal.innerText = `${Math.floor(activeCell.glucose)} / ${glcMax}`;
+
+        // Carbon
+        const cMax = activeCell.maxCarbon || 100;
+        const cPct = (activeCell.carbon / cMax) * 100;
+        const cBar = document.getElementById('hudCarbonBar');
+        if (cBar) cBar.style.width = cPct + '%';
+        const cVal = document.getElementById('hudCarbonVal');
+        if (cVal) cVal.innerText = `${Math.floor(activeCell.carbon)} / ${cMax}`;
+
+        // Nitrogen
+        const nMax = activeCell.maxNitrogen || 100;
+        const nPct = (activeCell.nitrogen / nMax) * 100;
+        const nBar = document.getElementById('hudNitrogenBar');
+        if (nBar) nBar.style.width = nPct + '%';
+        const nVal = document.getElementById('hudNitrogenVal');
+        if (nVal) nVal.innerText = `${Math.floor(activeCell.nitrogen)} / ${nMax}`;
+
+        // Phosphate
+        const pMax = activeCell.maxPhosphate || 100;
+        const pPct = (activeCell.phosphate / pMax) * 100;
+        const pBar = document.getElementById('hudPhosphateBar');
+        if (pBar) pBar.style.width = pPct + '%';
+        const pVal = document.getElementById('hudPhosphateVal');
+        if (pVal) pVal.innerText = `${Math.floor(activeCell.phosphate)} / ${pMax}`;
 
     } else {
         document.getElementById('hudAtpVal').innerText = "-";
@@ -981,29 +1031,6 @@ function updateHUD() {
         if (document.getElementById('hudAtpBar')) document.getElementById('hudAtpBar').style.width = '0%';
         if (document.getElementById('hudAminoBar')) document.getElementById('hudAminoBar').style.width = '0%';
         if (document.getElementById('hudNucleoBar')) document.getElementById('hudNucleoBar').style.width = '0%';
-    }
-
-    // Raw Materials Display
-    let rawContainer = document.getElementById('hudRaw');
-    if (!rawContainer) {
-        const hudContent = document.querySelector('.hud-content');
-        if (hudContent) {
-            rawContainer = document.createElement('div');
-            rawContainer.id = 'hudRaw';
-            rawContainer.style.marginTop = '10px';
-            rawContainer.style.fontSize = '0.9em';
-            rawContainer.style.color = '#AAA';
-            hudContent.appendChild(rawContainer);
-        }
-    }
-
-    if (rawContainer && activeCell) {
-        rawContainer.innerHTML = `
-            <strong>Raw Materials:</strong><br>
-            C: ${Math.floor(activeCell.carbon || 0)} <span style="color:#FFEB3B">●</span>
-            N: ${Math.floor(activeCell.nitrogen || 0)} <span style="color:#2196F3">■</span>
-            P: ${Math.floor(activeCell.phosphate || 0)} <span style="color:#F44336">■</span>
-        `;
     }
 }
 

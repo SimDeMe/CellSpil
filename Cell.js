@@ -433,8 +433,12 @@ export class Cell {
 
         // 1. Fermentation (Glucose -> ATP)
         // Glycolysis + Fermentation: 2 ATP per Glucose
-        if (this.glucose > 0) {
-            const amount = Math.min(this.glucose, rates.fermentationRate);
+        // Feedback Inhibition: Rate decreases as ATP nears max
+        if (this.glucose > 0 && this.atp < this.maxAtp) {
+            const inhibition = Math.max(0, 1 - (this.atp / this.maxAtp));
+            const rate = rates.fermentationRate * inhibition;
+
+            const amount = Math.min(this.glucose, rate);
             this.glucose -= amount;
             this.atp = Math.min(this.atp + amount * rates.fermentationYield, this.maxAtp);
         }
