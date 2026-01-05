@@ -36,11 +36,23 @@ export class Cell {
 
         this.atp = this.stats.maxAtp;
         this.maxAtp = this.stats.maxAtp;
+
+        // Refined Resources
         this.aminoAcids = 0;
         this.maxAminoAcids = this.stats.maxAmino;
         this.nucleotides = 0;
         this.baseMaxNucleotides = this.stats.maxNucleotides;
         this.maxNucleotides = this.stats.maxNucleotides;
+
+        // Raw Materials (Metabolism)
+        this.glucose = 0; // External Carbon Source
+        this.carbon = 0;  // Internal C-atoms (from Catabolism)
+        this.nitrogen = 0;
+        this.phosphate = 0;
+
+        // Complex Stores (from Predation)
+        this.storedDna = 0;
+        this.storedProtein = 0;
 
         this.alive = true;
         this.age = 0;
@@ -57,12 +69,22 @@ export class Cell {
 
         this.isDividing = false;
 
-        // Secretion State: idle -> forming -> ready -> releasing
-        this.secretion = {
-            state: 'idle',
+        // Secretion & Production
+        this.vesicles = []; // Stored vesicles (strings: 'toxin', 'protease')
+        this.maxVesicles = 5;
+
+        this.production = {
+            state: 'idle', // idle, producing
             type: null,
             timer: 0,
-            maxTimer: 40 // 0-30 forming, 30-40 releasing
+            maxTimer: 30
+        };
+
+        this.secretion = {
+            state: 'idle', // idle, releasing
+            type: null,
+            timer: 0,
+            maxTimer: 10 // Animation time for release
         };
 
         this.onAction = null;
@@ -129,10 +151,11 @@ export class Cell {
 
         const atpMult = 1.0 + (this.genes.atpStorage || 0) * 0.1;
         const aminoMult = 1.0 + (this.genes.aminoStorage || 0) * 0.1;
-        const nucleoMult = 1.0 + (this.genes.nucleotideStorage || 0) * 0.1;
 
         this.maxAminoAcids = cost * aminoMult;
-        this.maxNucleotides = this.stats.maxNucleotides * nucleoMult;
+        // Nucleotides cap matches division cost exactly (dynamic)
+        const divCost = this.getDivisionCost();
+        this.maxNucleotides = divCost.nucleotide;
 
         if (this.genes.megacytosis) {
             this.size = 2;
@@ -170,8 +193,9 @@ export class Cell {
     }
 
     produce(type) {
-        // Can only produce if idle
-        if (this.secretion.state !== 'idle') return;
+        // Check limits and state
+        if (this.production.state !== 'idle') return;
+        if (this.vesicles.length >= this.maxVesicles) return;
 
         let costAtp = 0;
         let costAmino = 0;
@@ -182,18 +206,19 @@ export class Cell {
         if (this.atp >= costAtp && this.aminoAcids >= costAmino) {
             this.atp -= costAtp;
             this.aminoAcids -= costAmino;
-            this.secretion.state = 'forming';
-            this.secretion.type = type;
-            this.secretion.timer = 0;
-            // Forming: 0-30. Ready: 30. Releasing: 30-40.
+            this.production.state = 'producing';
+            this.production.type = type;
+            this.production.timer = 0;
         }
     }
 
     activateAbility() {
-        // Only release if ready
-        if (this.secretion.state === 'ready') {
+        // Only release if idle and have ammo
+        if (this.secretion.state === 'idle' && this.vesicles.length > 0) {
+            const type = this.vesicles.shift(); // FIFO or LIFO? Shift is FIFO.
             this.secretion.state = 'releasing';
-            this.secretion.timer = 30;
+            this.secretion.type = type;
+            this.secretion.timer = 0;
         }
     }
 
@@ -215,36 +240,39 @@ export class Cell {
 
         this.isTakingDamage = false;
 
+        this.metabolize();
+
         const morphDt = 0.2 + (this.currentSpeed * 2.0);
         this.morphology.update(morphDt);
 
-        // Secretion Logic
-        if (this.secretion.state !== 'idle') {
-            if (this.secretion.state === 'forming') {
-                this.secretion.timer++;
-                if (this.secretion.timer >= 30) {
-                    this.secretion.state = 'ready';
-                    // Stays ready until activated
-                }
+        // Production Logic
+        if (this.production.state === 'producing') {
+            this.production.timer++;
+            if (this.production.timer >= this.production.maxTimer) {
+                this.vesicles.push(this.production.type);
+                this.production.state = 'idle';
+                this.production.timer = 0;
             }
-            else if (this.secretion.state === 'releasing') {
-                this.secretion.timer++;
-                if (this.secretion.timer >= this.secretion.maxTimer) {
-                    // Fire
-                    if (this.onAction) {
-                        const angle = (this.isPlayer && mouse)
-                            ? Math.atan2(mouse.y - this.y, mouse.x - this.x)
-                            : this.moveAngle;
+        }
 
-                        const offset = this.radius + 5;
-                        const sx = this.x + Math.cos(angle) * offset;
-                        const sy = this.y + Math.sin(angle) * offset;
+        // Secretion Release Logic
+        if (this.secretion.state === 'releasing') {
+            this.secretion.timer++;
+            if (this.secretion.timer >= this.secretion.maxTimer) {
+                // Fire
+                if (this.onAction) {
+                    const angle = (this.isPlayer && mouse)
+                        ? Math.atan2(mouse.y - this.y, mouse.x - this.x)
+                        : this.moveAngle;
 
-                        this.onAction(this.secretion.type, sx, sy, angle);
-                    }
-                    this.secretion.state = 'idle';
-                    this.secretion.timer = 0;
+                    const offset = this.radius + 5;
+                    const sx = this.x + Math.cos(angle) * offset;
+                    const sy = this.y + Math.sin(angle) * offset;
+
+                    this.onAction(this.secretion.type, sx, sy, angle);
                 }
+                this.secretion.state = 'idle';
+                this.secretion.timer = 0;
             }
         }
 
@@ -394,10 +422,88 @@ export class Cell {
 
         if (this.atp <= 0) this.kill();
 
-        // Integer Enforcement
-        this.atp = Math.floor(this.atp);
-        this.aminoAcids = Math.floor(this.aminoAcids);
-        this.nucleotides = Math.floor(this.nucleotides);
+        // Integer Enforcement - Removed to allow fractional drain
+        // this.atp = Math.floor(this.atp);
+        // this.aminoAcids = Math.floor(this.aminoAcids);
+        // this.nucleotides = Math.floor(this.nucleotides);
+    }
+
+    metabolize() {
+        const rates = GameConfig.Resources;
+
+        // 1. Fermentation (Glucose -> ATP)
+        // Glycolysis + Fermentation: 2 ATP per Glucose
+        // Feedback Inhibition: Rate decreases as ATP nears max
+        if (this.glucose > 0 && this.atp < this.maxAtp) {
+            const inhibition = Math.max(0, 1 - (this.atp / this.maxAtp));
+            const rate = rates.fermentationRate * inhibition;
+
+            const amount = Math.min(this.glucose, rate);
+            this.glucose -= amount;
+            this.atp = Math.min(this.atp + amount * rates.fermentationYield, this.maxAtp);
+        }
+    }
+
+    // --- KATABOLISME (Breakdown) ---
+
+    catabolizeGlucose() {
+        // 1 Glucose + 1 ATP -> 6 Carbon
+        if (this.glucose >= 1 && this.atp >= 1) {
+            this.glucose -= 1;
+            this.atp -= 1;
+            this.carbon += 6;
+            return true;
+        }
+        return false;
+    }
+
+    catabolizeProtein() {
+        // 1 Protein + 1 ATP -> 3 Amino Acids
+        if (this.storedProtein >= 1 && this.atp >= 1) {
+            this.storedProtein -= 1;
+            this.atp -= 1;
+            this.aminoAcids = Math.min(this.aminoAcids + 3, this.maxAminoAcids);
+            return true;
+        }
+        return false;
+    }
+
+    catabolizeDna() {
+        // 1 DNA + 2 ATP -> 3 Nucleotides
+        if (this.storedDna >= 1 && this.atp >= 2) {
+            this.storedDna -= 1;
+            this.atp -= 2;
+            this.nucleotides = Math.min(this.nucleotides + 3, this.maxNucleotides);
+            return true;
+        }
+        return false;
+    }
+
+    // --- ANABOLISME (Synthesis) ---
+
+    anabolizeAmino() {
+        // 4 C + 1 N + 1 ATP -> 1 Amino Acid
+        if (this.carbon >= 4 && this.nitrogen >= 1 && this.atp >= 1 && this.aminoAcids < this.maxAminoAcids) {
+            this.carbon -= 4;
+            this.nitrogen -= 1;
+            this.atp -= 1;
+            this.aminoAcids += 1;
+            return true;
+        }
+        return false;
+    }
+
+    anabolizeNucleotide() {
+        // 10 C + 3 N + 1 P + 5 ATP -> 1 Nucleotide
+        if (this.carbon >= 10 && this.nitrogen >= 3 && this.phosphate >= 1 && this.atp >= 5 && this.nucleotides < this.maxNucleotides) {
+            this.carbon -= 10;
+            this.nitrogen -= 3;
+            this.phosphate -= 1;
+            this.atp -= 5;
+            this.nucleotides += 1;
+            return true;
+        }
+        return false;
     }
 
     draw(g) {

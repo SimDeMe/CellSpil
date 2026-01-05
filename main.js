@@ -81,9 +81,9 @@ window.addEventListener('keydown', (e) => {
     }
     // Shortcuts for Production
     if (e.key === '1') {
-        if (activeCell) activeCell.produce('toxin');
+        if (activeCell && activeCell.genes.toxin) activeCell.produce('toxin');
     } else if (e.key === '2') {
-        if (activeCell) activeCell.produce('protease');
+        if (activeCell && activeCell.genes.protease) activeCell.produce('protease');
     }
 });
 
@@ -186,17 +186,49 @@ function setupProductionUI() {
     };
 
     const btnToxin = document.createElement('button');
-    btnToxin.innerText = "[1] Synthesize Toxin (15 ATP, 1 Amino)";
+    btnToxin.id = 'btnToxin';
+    btnToxin.innerText = "[1] Synthesize Toxin (Release: E)";
     styleBtn(btnToxin, '#00E676');
     btnToxin.onclick = () => { if (activeCell) activeCell.produce('toxin'); };
 
     const btnEnzyme = document.createElement('button');
-    btnEnzyme.innerText = "[2] Synthesize Enzyme (10 ATP, 1 Amino)";
+    btnEnzyme.id = 'btnEnzyme';
+    btnEnzyme.innerText = "[2] Synthesize Enzyme (Release: R)";
     styleBtn(btnEnzyme, '#E91E63');
     btnEnzyme.onclick = () => { if (activeCell) activeCell.produce('protease'); };
 
     container.appendChild(btnToxin);
     container.appendChild(btnEnzyme);
+}
+
+function updateProductionButtons() {
+    if (!activeCell) return;
+    const btnToxin = document.getElementById('btnToxin');
+    const btnEnzyme = document.getElementById('btnEnzyme');
+
+    if (btnToxin) {
+        if (activeCell.genes.toxin) {
+            btnToxin.disabled = false;
+            btnToxin.style.opacity = '1';
+            btnToxin.style.filter = 'none';
+        } else {
+            btnToxin.disabled = true;
+            btnToxin.style.opacity = '0.5';
+            btnToxin.style.filter = 'grayscale(100%)';
+        }
+    }
+
+    if (btnEnzyme) {
+        if (activeCell.genes.protease) {
+            btnEnzyme.disabled = false;
+            btnEnzyme.style.opacity = '1';
+            btnEnzyme.style.filter = 'none';
+        } else {
+            btnEnzyme.disabled = true;
+            btnEnzyme.style.opacity = '0.5';
+            btnEnzyme.style.filter = 'grayscale(100%)';
+        }
+    }
 }
 
 function updateGameTimer(dt) {
@@ -560,6 +592,10 @@ function updateInspectorContent() {
         renderMetabolismTab();
     } else if (activeTabId === 'tabCells') {
         renderCellsTab();
+    } else if (activeTabId === 'tabKatabolisme') {
+        renderKatabolismeTab();
+    } else if (activeTabId === 'tabAnabolisme') {
+        renderAnabolismeTab();
     }
 }
 
@@ -609,7 +645,7 @@ function renderMutationsTab() {
 
     addItem('atpStorage', 'ATP Lager', '+10% Max ATP per level (Max 5).');
     addItem('aminoStorage', 'Aminosyre Lager', '+10% Max Aminosyrer per level (Max 5).');
-    addItem('nucleotideStorage', 'Nukleotid Lager', '+10% Max Nukleotider per level (Max 5).');
+    // addItem('nucleotideStorage', 'Nukleotid Lager', '+10% Max Nukleotider per level (Max 5).'); // Removed
 
     addItem('endocytosis', 'Endocytosis', 'Spis mindre celler direkte.');
     addItem('gramPositive', 'Gram Positive', 'Tyk cellevæg (Defense).');
@@ -658,11 +694,22 @@ function renderMetabolismTab() {
     createStat("Nukleotider (DNA)", activeCell.nucleotides, activeCell.maxNucleotides, '#E040FB');
 
     const details = document.createElement('div');
+    const atpSurplus = activeCell.atp >= (activeCell.maxAtp * 0.9);
+    const rateText = atpSurplus ?
+        "<span style='color:orange'>Inhibited (ATP High)</span>" :
+        "<span style='color:#00E676'>Active</span>";
+
     details.innerHTML = `
-        <h3 style="margin-top:20px; border-bottom:1px solid #444; padding-bottom:5px;">Stats</h3>
-        <p>Speed: <span style="color:#fff">${activeCell.genes.flagellum ? "High" : "Low"}</span></p>
-        <p>Defense: <span style="color:#fff">${activeCell.genes.gramPositive ? "High" : "Normal"}</span></p>
-        <p>Diet: <span style="color:#fff">Omnivore (Altædende)</span></p>
+        <h3 style="margin-top:20px; border-bottom:1px solid #444; padding-bottom:5px;">Metabolism Details</h3>
+        <p><strong>Glycolysis & Fermentation:</strong> ${rateText}</p>
+        <p style="font-size:0.9em; color:#aaa;">Converts Glucose -> ATP automatically when ATP is low.</p>
+
+        <div style="margin-top:10px; padding:10px; background:#1a1a1a; border-radius:5px;">
+           <div><strong>Glucose (Yellow):</strong> Energy source.</div>
+           <div><strong>Carbon (White):</strong> Backbone for Amino Acids.</div>
+           <div><strong>Nitrogen (Blue):</strong> Required for Amino/DNA.</div>
+           <div><strong>Phosphate (Red):</strong> Required for DNA/ATP.</div>
+        </div>
     `;
     container.appendChild(details);
 }
@@ -830,6 +877,82 @@ function setupInspectorModal() {
     });
 }
 
+function renderKatabolismeTab() {
+    const container = document.getElementById('katabolismeContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!activeCell) return;
+
+    const addBtn = (label, action, enabled) => {
+        const btn = document.createElement('button');
+        btn.innerText = label;
+        btn.className = 'action-btn';
+        btn.disabled = !enabled;
+        btn.style.width = '100%';
+        btn.style.marginBottom = '10px';
+        if (!enabled) btn.style.opacity = 0.5;
+
+        btn.onclick = () => {
+            if (action()) updateInspectorContent();
+        };
+        container.appendChild(btn);
+    };
+
+    addBtn(
+        `Breakdown Glucose (1 ATP -> 6 C) [Stock: ${Math.floor(activeCell.glucose)}]`,
+        () => activeCell.catabolizeGlucose(),
+        activeCell.glucose >= 1 && activeCell.atp >= 1
+    );
+
+    addBtn(
+        `Breakdown Protein (1 ATP -> 3 Amino) [Stock: ${activeCell.storedProtein}]`,
+        () => activeCell.catabolizeProtein(),
+        activeCell.storedProtein >= 1 && activeCell.atp >= 1
+    );
+
+    addBtn(
+        `Breakdown DNA (2 ATP -> 3 Nucleo) [Stock: ${activeCell.storedDna}]`,
+        () => activeCell.catabolizeDna(),
+        activeCell.storedDna >= 1 && activeCell.atp >= 2
+    );
+}
+
+function renderAnabolismeTab() {
+    const container = document.getElementById('anabolismeContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!activeCell) return;
+
+    const addBtn = (label, action, enabled) => {
+        const btn = document.createElement('button');
+        btn.innerText = label;
+        btn.className = 'action-btn';
+        btn.disabled = !enabled;
+        btn.style.width = '100%';
+        btn.style.marginBottom = '10px';
+        if (!enabled) btn.style.opacity = 0.5;
+
+        btn.onclick = () => {
+            if (action()) updateInspectorContent();
+        };
+        container.appendChild(btn);
+    };
+
+    addBtn(
+        `Synthesize Amino (4C, 1N, 1ATP)`,
+        () => activeCell.anabolizeAmino(),
+        activeCell.carbon >= 4 && activeCell.nitrogen >= 1 && activeCell.atp >= 1
+    );
+
+    addBtn(
+        `Synthesize Nucleotide (10C, 3N, 1P, 5ATP)`,
+        () => activeCell.anabolizeNucleotide(),
+        activeCell.carbon >= 10 && activeCell.nitrogen >= 3 && activeCell.phosphate >= 1 && activeCell.atp >= 5
+    );
+}
+
 function updateHUD() {
     document.getElementById('hudGen').innerText = generation;
     const pop = otherCells.filter(c => !c.isBacillus && c.alive).length + (activeCell ? 1 : 0);
@@ -847,12 +970,14 @@ function updateHUD() {
     }
 
     if (activeCell) {
+        // ATP
         const atpPct = (activeCell.atp / activeCell.maxAtp) * 100;
         const atpBar = document.getElementById('hudAtpBar');
         if (atpBar) atpBar.style.width = atpPct + '%';
         const atpVal = document.getElementById('hudAtpVal');
         if (atpVal) atpVal.innerText = `${Math.floor(activeCell.atp)} / ${activeCell.maxAtp}`;
 
+        // Amino
         const divCost = GameConfig.Player.divisionCost;
         const aminoPct = (activeCell.aminoAcids / activeCell.maxAminoAcids) * 100;
         const aminoBar = document.getElementById('hudAminoBar');
@@ -860,11 +985,44 @@ function updateHUD() {
         const aminoVal = document.getElementById('hudAminoVal');
         if (aminoVal) aminoVal.innerText = `${activeCell.aminoAcids} / ${activeCell.maxAminoAcids} (Div: ${divCost.amino})`;
 
+        // Nucleotides
         const nucleoPct = (activeCell.nucleotides / activeCell.maxNucleotides) * 100;
         const nucleoBar = document.getElementById('hudNucleoBar');
         if (nucleoBar) nucleoBar.style.width = nucleoPct + '%';
         const nucleoVal = document.getElementById('hudNucleoVal');
         if (nucleoVal) nucleoVal.innerText = `${activeCell.nucleotides} / ${activeCell.maxNucleotides} (Div: ${divCost.nucleotide})`;
+
+        // Glucose
+        const glcMax = activeCell.maxGlucose || 100;
+        const glcPct = (activeCell.glucose / glcMax) * 100;
+        const glcBar = document.getElementById('hudGlucoseBar');
+        if (glcBar) glcBar.style.width = glcPct + '%';
+        const glcVal = document.getElementById('hudGlucoseVal');
+        if (glcVal) glcVal.innerText = `${Math.floor(activeCell.glucose)} / ${glcMax}`;
+
+        // Carbon
+        const cMax = activeCell.maxCarbon || 100;
+        const cPct = (activeCell.carbon / cMax) * 100;
+        const cBar = document.getElementById('hudCarbonBar');
+        if (cBar) cBar.style.width = cPct + '%';
+        const cVal = document.getElementById('hudCarbonVal');
+        if (cVal) cVal.innerText = `${Math.floor(activeCell.carbon)} / ${cMax}`;
+
+        // Nitrogen
+        const nMax = activeCell.maxNitrogen || 100;
+        const nPct = (activeCell.nitrogen / nMax) * 100;
+        const nBar = document.getElementById('hudNitrogenBar');
+        if (nBar) nBar.style.width = nPct + '%';
+        const nVal = document.getElementById('hudNitrogenVal');
+        if (nVal) nVal.innerText = `${Math.floor(activeCell.nitrogen)} / ${nMax}`;
+
+        // Phosphate
+        const pMax = activeCell.maxPhosphate || 100;
+        const pPct = (activeCell.phosphate / pMax) * 100;
+        const pBar = document.getElementById('hudPhosphateBar');
+        if (pBar) pBar.style.width = pPct + '%';
+        const pVal = document.getElementById('hudPhosphateVal');
+        if (pVal) pVal.innerText = `${Math.floor(activeCell.phosphate)} / ${pMax}`;
 
     } else {
         document.getElementById('hudAtpVal').innerText = "-";
@@ -878,6 +1036,7 @@ function updateHUD() {
 
 function updateUI() {
     if (!activeCell) return;
+    updateProductionButtons();
 }
 
 function showInspectorSidebar(show) {
@@ -927,7 +1086,8 @@ function gameLoop(deltaTime) {
             space: keys[' '],
             e: keys['e'],
             r: keys['r'],
-            m: keys['m']
+            m: keys['m'],
+            f: keys['f']
         };
 
         const worldMouse = {
@@ -959,13 +1119,33 @@ function gameLoop(deltaTime) {
 
     handleCellSwitch();
 
+    if (activeCell) window.activeCell = activeCell; // Expose for testing
     updateHUD();
+    updateUI(); // [FIX] Update Production UI
     drawMinimap();
 
     if (godMode && activeCell) {
         activeCell.atp = activeCell.maxAtp;
         activeCell.aminoAcids = activeCell.maxAminoAcids;
         activeCell.nucleotides = activeCell.maxNucleotides;
+    }
+}
+
+function handleCellSwitch() {
+    // Logic to switch cells if needed (e.g., via hotkey or auto-switch on death)
+    // Currently handled via UI or automatic logic in Environment.js
+}
+
+function handleDivision() {
+    if (!activeCell) return;
+    if (activeCell.isDividing) return;
+
+    // Trigger division if 'm' is pressed and resources are sufficient
+    if (keys['m']) {
+        const cost = activeCell.getDivisionCost();
+        if (activeCell.aminoAcids >= cost.amino && activeCell.nucleotides >= cost.nucleotide) {
+            activeCell.startDivision();
+        }
     }
 }
 
