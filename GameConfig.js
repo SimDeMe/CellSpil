@@ -9,7 +9,7 @@ export const GameConfig = {
     },
     Player: {
         baseSpeed: 2,
-        maxAtp: 100,
+        maxAtp: 30,
         baseMaxAmino: 6, // [UPDATED] Max 6
         baseMaxNucleotides: 6, // [UPDATED] Max 6
         divisionCost: { amino: 3, nucleotide: 3 }, // [NEW] Explicit division cost
