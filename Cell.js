@@ -149,6 +149,7 @@ export class Cell {
         if (this.genes.highTorque) cost += GameConfig.Player.mutationCosts.highTorque;
         if (this.genes.endocytosis) cost += GameConfig.Player.mutationCosts.endocytosis;
 
+<<<<<<< Updated upstream
         const atpMult = 1.0 + (this.genes.atpStorage || 0) * 0.1;
         const aminoMult = 1.0 + (this.genes.aminoStorage || 0) * 0.1;
 
@@ -186,6 +187,13 @@ export class Cell {
             amino: base.amino + mutationCount,
             nucleotide: base.nucleotide + mutationCount
         };
+=======
+        // --- DIVISION ANIMATION STATE ---
+        this.isDividing = false;
+        this.divisionTimer = 0;
+        this.divisionDuration = 60; // 60 frames = approx 1 second
+        this.abilityCooldown = 0;
+>>>>>>> Stashed changes
     }
 
     startDivision() {
@@ -220,6 +228,238 @@ export class Cell {
             this.secretion.type = type;
             this.secretion.timer = 0;
         }
+<<<<<<< Updated upstream
+=======
+
+        this.age++;
+        this.isTakingDamage = false; // [NEW] Reset damage flag for this frame
+
+        // --- ENDOCYTOSIS ANIMATION ---
+        if (this.engulfed) {
+            // ... existing engulfment logic ...
+            this.radius *= 0.95;
+            if (this.radius < 2) this.shouldRemove = true;
+            if (this.engulfedBy) {
+                this.x += (this.engulfedBy.x - this.x) * 0.1;
+                this.y += (this.engulfedBy.y - this.y) * 0.1;
+            }
+            return; // Stop other updates
+        }
+
+        // --- UPKEEP & RESOURCES ---
+        // (Cost logic from before...)
+
+        if (this.genes.pili) this.atp -= GameConfig.Player.upkeep.pili;
+        if (this.genes.highSpeedRetraction) this.atp -= GameConfig.Player.upkeep.highSpeedRetraction;
+        if (this.genes.multiplexPili) this.atp -= GameConfig.Player.upkeep.multiplexPili;
+
+        let moveSpeed = 0.4; // Base drift
+
+        // Modifiers
+        if (this.genes.megacytosis) moveSpeed *= 0.5;
+
+        // --- FLAGELLUM MOVEMENT (Continuous) ---
+        if (this.genes.flagellum) {
+            moveSpeed += 2.0;
+            if (this.genes.highTorque) moveSpeed += 2.0;
+        }
+
+        // --- PILI MOVEMENT (Twitch Motility) ---
+        let piliMoveSpeed = 0;
+
+        if (this.genes.pili && this.alive && this.isPlayer) {
+            // 1. Calculate Target (Mouse)
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Params based on upgrades
+            const extendSpeed = 5; // How fast it shoots out
+            let retractSpeed = 2; // Base pull speed
+
+            // [TUNED] Shorter lengths for better control
+            let maxLen = 30; // Reduced from 60
+
+            if (this.genes.highSpeedRetraction) {
+                retractSpeed = 6; // Much faster pull
+                maxLen = 45; // Reduced from 80
+            }
+            if (this.genes.multiplexPili) {
+                retractSpeed = 8; // Even faster
+                maxLen = 60; // Reduced from 100
+            }
+            this.piliMaxLength = maxLen;
+
+            // State Machine
+            if (this.piliState === 'idle') {
+                if (dist > this.radius + 10) {
+                    // Start extending towards mouse
+                    this.piliState = 'extending';
+                    this.piliTargetAngle = Math.atan2(dy, dx);
+                    this.piliLength = 0;
+                    // Lock angle for this twitch
+                    this.angle = this.piliTargetAngle;
+                }
+            }
+            else if (this.piliState === 'extending') {
+                this.piliLength += extendSpeed;
+                // Stop moving while extending (anchor)
+                moveSpeed *= 0.1;
+
+                if (this.piliLength >= this.piliMaxLength || this.piliLength >= dist) {
+                    this.piliState = 'retracting';
+                }
+            }
+            else if (this.piliState === 'retracting') {
+                this.piliLength -= retractSpeed;
+                // PULL THE CELL!
+                // The cell moves towards the tip of the pili
+                piliMoveSpeed = retractSpeed * 1.5; // Cell moves faster than retraction to catch up? No, 1:1 usually.
+                // Let's make it add significant speed.
+
+                if (this.piliLength <= 0) {
+                    this.piliLength = 0;
+                    this.piliState = 'idle';
+                }
+            }
+        }
+
+        // Apply Movement
+        if (this.isPlayer && inputKeys) {
+            // ... (Cheats and Abilities logic) ...
+            if (inputKeys.s && inputKeys.c) { // S + C = Cheat
+                this.atp = this.maxAtp;
+                this.aminoAcids = this.maxAminoAcids;
+                console.log("CHEAT: Full Resources");
+            }
+
+            // ... ABILITY COOLDOWNS ...
+            if (this.abilityCooldown > 0) {
+                this.abilityCooldown--;
+            }
+
+            // ... TOXIN ...
+            if (inputKeys.e && this.genes.toxin) {
+                if (this.abilityCooldown <= 0 && this.aminoAcids >= 1) {
+                    if (this.onAction) {
+                        this.onAction('toxin', this.x, this.y);
+                        this.aminoAcids -= 1; // Kun amino
+
+                        // Sæt cooldown (fx 60 frames = 1 sekund)
+                        this.abilityCooldown = 30; // 0.5 sekunder
+
+                        // Reset key for good measure
+                        inputKeys.e = false;
+                    }
+                }
+            }
+
+            // ... PROTEASE ...
+            if (inputKeys.r && this.genes.protease) {
+                if (this.abilityCooldown <= 0 && this.aminoAcids >= 1) {
+                    if (this.onAction) {
+                        this.onAction('protease', this.x, this.y);
+                        this.aminoAcids -= 1; // Kun amino
+
+                        this.abilityCooldown = 30; // 0.5 sekunder
+
+                        inputKeys.r = false;
+                    }
+                }
+            }
+
+            // Player Movement Calculation
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 1. Check for Key Input (Priority over Mouse)
+            let moveX = 0;
+            let moveY = 0;
+            if (inputKeys && (inputKeys.up || inputKeys.down || inputKeys.left || inputKeys.right)) {
+                if (inputKeys.up) moveY -= 1;
+                if (inputKeys.down) moveY += 1;
+                if (inputKeys.left) moveX -= 1;
+                if (inputKeys.right) moveX += 1;
+            }
+
+            if ((moveX !== 0 || moveY !== 0) && !this.genes.pili) {
+                // KEYBOARD MOVEMENT
+                this.angle = Math.atan2(moveY, moveX);
+
+                // Normalize vector
+                const len = Math.sqrt(moveX * moveX + moveY * moveY);
+                // Apply full speed immediately for responsive feel
+                const totalSpeed = moveSpeed;
+
+                this.x += (moveX / len) * totalSpeed;
+                this.y += (moveY / len) * totalSpeed;
+
+                // ATP Cost
+                let cost = GameConfig.Player.moveCost;
+                if (this.genes.flagellum) cost = GameConfig.Player.moveCostOverride.flagellum;
+                this.atp -= cost;
+
+            } else if (distance > this.radius && !this.genes.pili) {
+                // MOUSE FOLLOWER (Fallback if no keys pressed)
+                this.angle = Math.atan2(dy, dx);
+                let speedFactor = (distance - this.radius) / (viewHeight * 0.5 - this.radius);
+                if (speedFactor > 1) speedFactor = 1;
+
+                const totalSpeed = moveSpeed * speedFactor;
+                this.currentSpeed = totalSpeed; // Capture actual speed
+                this.x += (dx / distance) * totalSpeed;
+                this.y += (dy / distance) * totalSpeed;
+
+                // ATP Cost
+                let cost = GameConfig.Player.moveCost;
+                if (this.genes.flagellum) cost = GameConfig.Player.moveCostOverride.flagellum;
+                this.atp -= cost * speedFactor;
+
+            }
+            else if (this.genes.pili) {
+                // PILI MOVEMENT APPLY
+                // Use saved angle, not current mouse angle (it locks on fire)
+                if (this.piliState === 'retracting') {
+                    const moveX = Math.cos(this.piliTargetAngle) * piliMoveSpeed;
+                    const moveY = Math.sin(this.piliTargetAngle) * piliMoveSpeed;
+                    this.currentSpeed = piliMoveSpeed;
+                    this.x += moveX;
+                    this.y += moveY;
+
+                    // ATP Cost for Pili Pull
+                    let cost = GameConfig.Player.moveCostOverride.pili;
+                    if (this.genes.highSpeedRetraction) cost = GameConfig.Player.moveCostOverride.highSpeedRetraction;
+                    if (this.genes.multiplexPili) cost = GameConfig.Player.moveCostOverride.multiplexPili;
+                    this.atp -= cost;
+                }
+            }
+        }
+        else {
+            // NPC Movement (Random)
+            // ...
+            this.moveAngle += (Math.random() - 0.5) * 0.1;
+            const npcSpeed = moveSpeed * 0.5;
+            this.currentSpeed = npcSpeed;
+            this.x += Math.cos(this.moveAngle) * npcSpeed;
+            this.y += Math.sin(this.moveAngle) * npcSpeed;
+            this.atp -= 0.01;
+        }
+
+        // ... (Brownian, Boundary, Death) ...
+        this.x += (Math.random() - 0.5) * 0.5;
+        this.y += (Math.random() - 0.5) * 0.5;
+        // ... (Boundary checks) ...
+        if (this.x - this.radius < 0) this.x = this.radius; // etc
+        // ...
+        if (this.atp <= 0) this.kill();
+
+        // 5. Grænsekontrol (Simplified for replace)
+        if (this.x - this.radius < 0) this.x = this.radius;
+        else if (this.x + this.radius > width) this.x = width - this.radius;
+        if (this.y - this.radius < 0) this.y = this.radius;
+        else if (this.y + this.radius > width) this.y = height - this.radius;
+>>>>>>> Stashed changes
     }
 
     kill() {
