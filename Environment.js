@@ -774,9 +774,9 @@ function spawnRandomFoodAt(x, y) {
     const typeRandom = Math.random();
     let type = 'carbon';
 
-    if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
+    if (typeRandom > GameConfig.SpawnRates.phosphateThreshold) {
         type = 'phosphate';
-    } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
+    } else if (typeRandom > GameConfig.SpawnRates.nitrogenThreshold) {
         type = 'nitrogen';
     }
 
@@ -796,11 +796,11 @@ export function spawnFood(width, height) {
         vy: 0
     };
 
-    if (typeRandom > GameConfig.SpawnRates.nucleotideThreshold) {
+    if (typeRandom > GameConfig.SpawnRates.phosphateThreshold) {
         particle.type = 'phosphate';
         particle.color = '#F44336'; // Red
         particle.radius = 4;
-    } else if (typeRandom > GameConfig.SpawnRates.aminoThreshold) {
+    } else if (typeRandom > GameConfig.SpawnRates.nitrogenThreshold) {
         particle.type = 'nitrogen';
         particle.color = '#2196F3'; // Blue
         particle.radius = 4;

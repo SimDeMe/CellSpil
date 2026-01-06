@@ -8,7 +8,7 @@ export const GameConfig = {
         invasionTime: 60000, // ms
     },
     Player: {
-        baseSpeed: 2,
+        baseSpeed: 4,
         maxAtp: 30,
         baseMaxAmino: 6, // [UPDATED] Max 6
         baseMaxNucleotides: 6, // [UPDATED] Max 6
@@ -84,7 +84,7 @@ export const GameConfig = {
 
         // Metabolism Rates
         fermentationRate: 0.05, // Carbon -> ATP per tick
-        fermentationYield: 0.5, // ATP per Carbon unit (consumed slowly)
+        fermentationYield: 2.0, // ATP per Carbon unit (consumed slowly)
 
         synthesisCost: {
             amino: { carbon: 1, nitrogen: 1, atp: 5 },
@@ -92,8 +92,8 @@ export const GameConfig = {
         }
     },
     SpawnRates: {
-        aminoThreshold: 0.6,      // Hvis random > 0.8 -> Amino
-        nucleotideThreshold: 0.8 // Hvis random > 0.95 -> Nucleotide
+        nitrogenThreshold: 0.6,   // Hvis random > 0.6 -> Nitrogen (Blue)
+        phosphateThreshold: 0.8   // Hvis random > 0.8 -> Phosphate (Red)
     },
     DangerZones: {
         spawnRate: 3600, // Frames (e.g. 60 sec at 60fps). 3600 = 1 min. User said "a few minutes". Let's say 2 mins = 7200. Debug: 1200 (20s).
