@@ -645,6 +645,9 @@ export function performSplit(parent) {
     const pAmino = Math.max(0, parent.aminoAcids - divCost.amino);
     const pNucleo = Math.max(0, parent.nucleotides - divCost.nucleotide);
     const pAtp = parent.atp;
+    const pCarbon = parent.carbon;
+    const pNitrogen = parent.nitrogen;
+    const pPhosphate = parent.phosphate;
 
     // Helper to create copy
     // Use parent.constructor to handle Bacillus subclassing
@@ -674,6 +677,9 @@ export function performSplit(parent) {
         d.atp = Math.floor(pAtp / 2);
         d.aminoAcids = Math.floor(pAmino / 2);
         d.nucleotides = Math.floor(pNucleo / 2);
+        d.carbon = Math.floor(pCarbon / 2);
+        d.nitrogen = Math.floor(pNitrogen / 2);
+        d.phosphate = Math.floor(pPhosphate / 2);
 
         return d;
     };
