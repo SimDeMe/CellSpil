@@ -1,0 +1,14 @@
+{
+  "name": "cellspil",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CellSpil — overlevelses- og evolutionsspil. Ny kodebase (se ARCHITECTURE.md).",
+  "scripts": {
+    "balance": "node balance/simulate.js",
+    "balance:enemies": "node balance/simulate.js --enemies",
+    "balance:invariants": "node balance/simulate.js --invariants",
+    "smoke": "node src/smoke.js",
+    "smoke:movement": "node src/movementSmoke.js"
+  }
+}

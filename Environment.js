@@ -482,7 +482,7 @@ export function updateEnvironment(canvasWidth, canvasHeight, activeCell) {
         // Division Logic
         if (cell.alive) {
             // Bacillus Division
-            if (cell.isBacillus && cell.aminoAcids >= 3) {
+            if (cell.isBacillus && !cell.isMegabacillus && cell.aminoAcids >= 3) {
                 // Tjek max antal (50)
                 const bacillusCount = otherCells.filter(c => c.isBacillus && c.alive).length;
                 if (bacillusCount < GameConfig.Bacillus.populationCap) {
