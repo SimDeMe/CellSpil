@@ -19,7 +19,7 @@ function report(cell, world) {
 // --- Scenarie 1: mad i vandet → cellen lever og samler byggesten op til deling ---
 console.log('\nScenarie 1 — åbent vand (mad til rådighed):');
 {
-  const world = createWorld({ seed: 1, width: 1000, height: 1000 });
+  const world = createWorld({ seed: 1, width: 1000, height: 1000, spawn: false, zones: false });
   const cell = createCell(world.state, { x: 500, y: 500, isPlayer: true });
   for (let i = 0; i < 30 * 60; i++) world.step(STEP); // 30 sekunder
   report(cell, world);
@@ -30,7 +30,7 @@ console.log('\nScenarie 1 — åbent vand (mad til rådighed):');
 // --- Scenarie 2: tomt vand (ingen mad) → ATP løber ud, cellen dør ---
 console.log('\nScenarie 2 — tomt vand (ingen mad):');
 {
-  const world = createWorld({ seed: 1, width: 1000, height: 1000, environment: { food: 0 } });
+  const world = createWorld({ seed: 1, width: 1000, height: 1000, environment: { food: 0 }, spawn: false, zones: false });
   const cell = createCell(world.state, { x: 500, y: 500, isPlayer: true });
   let deathTime = null;
   for (let i = 0; i < 300 * 60 && deathTime === null; i++) {
@@ -45,7 +45,7 @@ console.log('\nScenarie 2 — tomt vand (ingen mad):');
 // --- Scenarie 3: deling over tid → én celle bliver til en voksende slægt ---
 console.log('\nScenarie 3 — deling over tid (åbent vand):');
 {
-  const world = createWorld({ seed: 1, width: 1000, height: 1000 });
+  const world = createWorld({ seed: 1, width: 1000, height: 1000, spawn: false, zones: false });
   createCell(world.state, { x: 500, y: 500, isPlayer: true });
   let prev = 0;
   for (const mark of [30, 60, 120, 180]) {

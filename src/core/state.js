@@ -19,7 +19,8 @@ import { Environment } from '../config/index.js';
 
 export function createWorldState(opts = {}) {
   const {
-    seed = 1, width = 5000, height = 5000, fieldCell = 100, environment = {},
+    seed = 1, width = 5000, height = 5000, fieldCell = 100, environment = {}, spawn = true,
+    zones = true,
   } = opts;
   const cols = Math.ceil(width / fieldCell);
   const rows = Math.ceil(height / fieldCell);
@@ -32,6 +33,10 @@ export function createWorldState(opts = {}) {
     entities: [],
     intents: [],
     nextId: 1,
+    // Slå automatisk spawn (mad/fjender) fra i isolerede tests, så ét system kan måles rent.
+    spawnEnabled: spawn,
+    // Slå dybde-zoner fra i isolerede tests, så cellerne bruger det faste state.environment.
+    zonesEnabled: zones,
     rng: createRng(seed),
     fields: new FieldGrid(cols, rows, fieldCell, params),
     spatial: new SpatialHash(fieldCell),

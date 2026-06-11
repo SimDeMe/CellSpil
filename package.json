@@ -11,6 +11,10 @@
     "smoke": "node src/smoke.js",
     "smoke:movement": "node src/movementSmoke.js",
     "smoke:combat": "node src/combatSmoke.js",
-    "smoke:spawn": "node src/spawnSmoke.js"
+    "smoke:spawn": "node src/spawnSmoke.js",
+    "smoke:feeding": "node src/feedingSmoke.js",
+    "smoke:lifecycle": "node src/lifecycleSmoke.js",
+    "smoke:environment": "node src/environmentSmoke.js",
+    "smoke:tolerance": "node src/toleranceSmoke.js"
   }
 }

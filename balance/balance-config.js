@@ -46,6 +46,37 @@ export const Environment = {
   },
 };
 
+// --- DYBDE-GRADIENT (miljøet ændrer sig lodret: overflade → dyb) ---
+// Cellens lokale miljø afhænger af dens y-position. at = brøkdel af verdenens højde
+// (0 = top/overflade, 1 = bund). Mellem to stop interpoleres lineært. anoxic (iltfrit) slår
+// til under anoxicBelow. Værdierne følger Zones: lavvand → åbent vand → mørkt dyb → iltfrit mudder.
+// temp/ph i 0..1: temp 0 = frysende, 1 = skoldhed; ph 0 = sur, 1 = basisk. Overfladen er varm,
+// dybet koldt; pH er stort set neutralt (sure/basiske lommer hører til farezoner senere).
+export const Depth = {
+  anoxicBelow: 0.8, // under 80% dybde er vandet iltfrit (mudder/vent)
+  stops: [
+    { at: 0.0, light: 1.0, oxygen: 0.8, food: 1.0, temp: 0.60, ph: 0.50, sulfur: 0.0, nitrate: 0.0, ammonia: 0.0, hydrogen: 0.0 }, // solbeskinnet lavvand
+    { at: 0.5, light: 0.5, oxygen: 0.5, food: 0.6, temp: 0.45, ph: 0.50, sulfur: 0.0, nitrate: 0.0, ammonia: 0.0, hydrogen: 0.0 }, // åbent vand
+    { at: 0.8, light: 0.0, oxygen: 0.2, food: 0.3, temp: 0.25, ph: 0.50, sulfur: 0.3, nitrate: 0.2, ammonia: 0.1, hydrogen: 0.2 }, // mørkt dyb
+    { at: 1.0, light: 0.0, oxygen: 0.0, food: 0.4, temp: 0.15, ph: 0.45, sulfur: 1.0, nitrate: 0.6, ammonia: 0.5, hydrogen: 1.0 }, // iltfrit mudder
+  ],
+};
+
+// --- TOLERANCE (miljø vs. cellens komfort-vinduer) ---
+// defaultRanges (0..1): standard-cellen er mesofil (temperatur) og neutrofil (pH). Inden for
+// opt-vinduet er der ingen skade; mellem opt og lethal stiger skaden lineært; uden for lethal
+// er skaden fuld. stressDamage/lethalDamage er ATP/s. oxygenToxicDamage rammer anaerobe
+// strategier (Metabolism.*.oxygenToxic) i for meget ilt — dæmpes af katalase (Defenses).
+export const Tolerance = {
+  defaultRanges: {
+    temp: { optMin: 0.35, optMax: 0.65, lethalMin: 0.10, lethalMax: 0.90 },
+    ph:   { optMin: 0.35, optMax: 0.65, lethalMin: 0.10, lethalMax: 0.90 },
+  },
+  stressDamage: 0.5,
+  lethalDamage: 2.0,
+  oxygenToxicDamage: 2.0,
+};
+
 // --- BEVÆGELSE ---
 export const Motility = {
   none:        { label: 'Drift',       moveCost: 0.0, speed: 0.0, upkeep: 0 },
@@ -69,6 +100,15 @@ export const World = {
   foodMax: 600,
   foodPerSecond: 8,
   enemySafeRadius: 600,
+};
+
+// --- FØDE (hvad en mad-partikel giver, når en celle æder den) ---
+// reach: ekstra rækkevidde ud over cellens radius for at "røre" maden.
+// Pr. type: pakke af ATP og byggesten (amino/nukleotid). ATP fyldes op til maxAtp; overskud
+// spildes. Byggesten lægges oven i og tæller med til deling. Flere typer kan tilføjes senere.
+export const Food = {
+  reach: 6,
+  glucose: { atp: 3, amino: 0.5, nucleotide: 0.5 }, // generisk næringspakke (pt. eneste type)
 };
 
 // --- AI (hvad autonome celler/fjender sigter efter) ---

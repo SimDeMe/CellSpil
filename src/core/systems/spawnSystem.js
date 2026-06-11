@@ -35,6 +35,7 @@ function spawnPos(state, player, safe) {
 
 /** @param {import('../state.js').WorldState} state @param {number} dt */
 export function spawnSystem(state, dt) {
+  if (state.spawnEnabled === false) return state; // isolerede tests kører uden auto-spawn
   const s = (state.spawn ??= { foodAcc: 0, enemyNext: {} });
 
   // --- MAD ---

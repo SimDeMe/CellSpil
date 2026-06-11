@@ -48,11 +48,13 @@ function upkeepFor(cell) {
 
 /** @param {import('../state.js').WorldState} state @param {number} dt */
 export function metabolismSystem(state, dt) {
-  const env = state.environment ?? Environment.ambient;
+  const globalEnv = state.environment ?? Environment.ambient;
 
   for (const e of state.entities) {
     if (e.dead || e.kind !== 'cell' || !e.energy) continue;
 
+    // Cellens lokale miljø (dybde-baseret, sat af environmentSystem) — ellers det globale.
+    const env = e.localEnv ?? globalEnv;
     const net = incomeFor(e.metabolism?.strategy, env) - upkeepFor(e);
     const gain = net * dt;
     const maxAtp = e.energy.maxAtp ?? Cell.maxAtp;

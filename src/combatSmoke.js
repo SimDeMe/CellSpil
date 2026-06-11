@@ -8,7 +8,7 @@ const STEP = 1 / 60;
 
 console.log('\nScenarie A — Megabacillus opsluger en lille spiller (16 skade/s):');
 {
-  const world = createWorld({ seed: 1, width: 5000, height: 5000 });
+  const world = createWorld({ seed: 1, width: 5000, height: 5000, spawn: false, zones: false });
   const player = createCell(world.state, { x: 2500, y: 2500, isPlayer: true }); // radius 20 < 30
   createEnemy(world.state, { x: 2520, y: 2500, type: 'megabacillus', hp: 250, radius: 36 });
 
@@ -24,7 +24,7 @@ console.log('\nScenarie A — Megabacillus opsluger en lille spiller (16 skade/s
 
 console.log('\nScenarie B — spiller med toksin slår en Bacillus ihjel:');
 {
-  const world = createWorld({ seed: 1, width: 5000, height: 5000 });
+  const world = createWorld({ seed: 1, width: 5000, height: 5000, spawn: false, zones: false });
   const player = createCell(world.state, { x: 2500, y: 2500, isPlayer: true, genes: ['toxin'] });
   const enemy = createEnemy(world.state, { x: 2516, y: 2500, type: 'bacillus', hp: 50, radius: 14 });
 
@@ -41,7 +41,7 @@ console.log('\nScenarie B — spiller med toksin slår en Bacillus ihjel:');
 
 console.log('\nScenarie C — stor spiller med endocytose opsluger en Bacillus øjeblikkeligt:');
 {
-  const world = createWorld({ seed: 1, width: 5000, height: 5000 });
+  const world = createWorld({ seed: 1, width: 5000, height: 5000, spawn: false, zones: false });
   const player = createCell(world.state, { x: 2500, y: 2500, isPlayer: true, genes: ['endocytosis'] });
   player.transform.radius = 40; // stor celle (≥ 120% af fjendens radius 14)
   const enemy = createEnemy(world.state, { x: 2540, y: 2500, type: 'bacillus', hp: 50, radius: 14 });

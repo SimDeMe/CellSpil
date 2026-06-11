@@ -12,7 +12,7 @@ function dist(cell, tx, ty) {
 
 console.log('\nScenarie — flagel-celle svømmer mod et mål og betaler ATP:');
 {
-  const world = createWorld({ seed: 1, width: 5000, height: 5000 });
+  const world = createWorld({ seed: 1, width: 5000, height: 5000, spawn: false, zones: false });
 
   // Svømmer: flagel + et fast mål langt væk (spillerens "musemål").
   const swimmer = createCell(world.state, { x: 500, y: 500, isPlayer: true, motility: 'flagellum' });
@@ -44,7 +44,7 @@ console.log('\nScenarie — flagel-celle svømmer mod et mål og betaler ATP:');
 
 console.log('\nScenarie — fjende får øje på spilleren og jager:');
 {
-  const world = createWorld({ seed: 1, width: 5000, height: 5000 });
+  const world = createWorld({ seed: 1, width: 5000, height: 5000, spawn: false, zones: false });
 
   // Spilleren står stille (intet musemål); en bacillus starter et stykke væk, inden for synsvidde.
   const player = createCell(world.state, { x: 2500, y: 2500, isPlayer: true, motility: 'flagellum' });
