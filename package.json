@@ -9,6 +9,8 @@
     "balance:enemies": "node balance/simulate.js --enemies",
     "balance:invariants": "node balance/simulate.js --invariants",
     "smoke": "node src/smoke.js",
-    "smoke:movement": "node src/movementSmoke.js"
+    "smoke:movement": "node src/movementSmoke.js",
+    "smoke:combat": "node src/combatSmoke.js",
+    "smoke:spawn": "node src/spawnSmoke.js"
   }
 }

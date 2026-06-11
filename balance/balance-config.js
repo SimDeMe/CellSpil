@@ -61,6 +61,16 @@ export const Motility = {
 // radius) før cellen regnes som "fremme" og holder op med at svømme.
 export const Movement = { speedScale: 150, arriveSlack: 2 };
 
+// --- VERDEN / SPAWN ---
+// foodMax: højeste antal mad-partikler i verden. foodPerSecond: hvor mange der dukker op pr.
+// sekund (op til cap). enemySafeRadius: fjender spawner mindst så langt fra spilleren (fair
+// varsel — aldrig oven i dig). Fjendernes egne spawn-tider/interval/cap står i Enemies.
+export const World = {
+  foodMax: 600,
+  foodPerSecond: 8,
+  enemySafeRadius: 600,
+};
+
 // --- AI (hvad autonome celler/fjender sigter efter) ---
 // huntVision: hvor langt en jæger ser sit bytte. forageVision: hvor langt en forager ser mad.
 // followKeep: forager/følger holder sig inden for denne afstand af lederen.
