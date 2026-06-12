@@ -14,7 +14,7 @@ function scaleFactor(param, env) {
 }
 
 /** ATP/s en strategi yder i et givet miljø — med krav-tjek og fallback. */
-function incomeFor(strategyId, env) {
+export function incomeFor(strategyId, env) {
   const s = Metabolism[strategyId];
   if (!s) return 0;
 
@@ -38,7 +38,7 @@ function incomeFor(strategyId, env) {
 }
 
 /** Samlet upkeep (ATP/s): basal + strategiens + alle geners. */
-function upkeepFor(cell) {
+export function upkeepFor(cell) {
   let upkeep = Cell.basalUpkeep;
   const s = Metabolism[cell.metabolism?.strategy];
   if (s?.upkeep) upkeep += s.upkeep;

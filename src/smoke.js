@@ -49,7 +49,12 @@ console.log('\nScenarie 3 — deling over tid (åbent vand):');
   createCell(world.state, { x: 500, y: 500, isPlayer: true });
   let prev = 0;
   for (const mark of [30, 60, 120, 180]) {
-    for (let i = 0; i < Math.round((mark - prev) * 60); i++) world.step(STEP);
+    // Spilleren deler sig nu KUN på valg — vi 'trykker på knappen' hver tick (divide-intent),
+    // så cellen deler sig, så snart den har byggesten nok (mens afkom deler sig selv).
+    for (let i = 0; i < Math.round((mark - prev) * 60); i++) {
+      world.state.intents.push({ type: 'divide' });
+      world.step(STEP);
+    }
     prev = mark;
     const cells = world.state.entities.filter((e) => e.kind === 'cell');
     const maxGen = Math.max(0, ...cells.map((c) => c.lineage.generation));

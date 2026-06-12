@@ -22,21 +22,23 @@ console.log('\nScenarie A — Megabacillus opsluger en lille spiller (16 skade/s
   console.log(`  → ${deathTime !== null ? `spilleren blev ædt og døde efter ${deathTime.toFixed(1)}s ✓` : 'spilleren overlevede uventet ✗'}`);
 }
 
-console.log('\nScenarie B — spiller med toksin slår en Bacillus ihjel:');
+console.log('\nScenarie B — spiller udskiller toksin-skyer og slår en Bacillus ihjel:');
 {
   const world = createWorld({ seed: 1, width: 5000, height: 5000, spawn: false, zones: false });
   const player = createCell(world.state, { x: 2500, y: 2500, isPlayer: true, genes: ['toxin'] });
+  player.energy.atp = 999; player.resources.amino = 99; // rigeligt til at udskille skyer i testen
   const enemy = createEnemy(world.state, { x: 2516, y: 2500, type: 'bacillus', hp: 50, radius: 14 });
 
   const startHp = enemy.combat.hp;
   let killTime = null;
-  for (let i = 0; i < 15 * 60 && killTime === null; i++) {
+  for (let i = 0; i < 20 * 60 && killTime === null; i++) {
+    if (i % 90 === 0) world.state.intents.push({ type: 'use-ability', ability: 'toxin' }); // udskil sky løbende
     world.step(STEP);
     if (enemy.dead && killTime === null) killTime = world.state.time;
   }
-  console.log(`  toksin-dps:  ${Offense.toxin.dps} · fjende-HP ${startHp} (≈ ${(startHp / Offense.toxin.dps).toFixed(1)}s til drab)`);
+  console.log(`  toksin-sky-dps: ${Offense.toxin.dps} · fjende-HP ${startHp}`);
   console.log(`  spiller lever: ${!player.dead}`);
-  console.log(`  → ${killTime !== null ? `fjenden døde efter ${killTime.toFixed(1)}s ✓` : 'fjenden overlevede ✗'}`);
+  console.log(`  → ${killTime !== null ? `fjenden døde i skyen efter ${killTime.toFixed(1)}s ✓` : 'fjenden overlevede ✗'}`);
 }
 
 console.log('\nScenarie C — stor spiller med endocytose opsluger en Bacillus øjeblikkeligt:');

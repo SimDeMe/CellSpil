@@ -8,6 +8,7 @@
 //   'follow' — holder sig nær den spiller-styrede celle (flokken samles).
 // Andre/ukendte politikker → strejf (driv tilfældigt rundt, så intet står dødt).
 import { AI } from '../../config/index.js';
+import { canAbsorb } from './feedingSystem.js';
 
 /** Nærmeste levende entitet, der opfylder match(), inden for radius — via spatial-index. */
 function nearest(state, x, y, radius, match) {
@@ -61,7 +62,8 @@ export function aiSystem(state, dt) {
         break;
       }
       case 'forage': {
-        const food = nearest(state, x, y, AI.forageVision, (c) => c.kind === 'food');
+        // Søg kun mad, cellen faktisk kan optage (spring fx maltose over uden maltase).
+        const food = nearest(state, x, y, AI.forageVision, (c) => c.kind === 'food' && canAbsorb(e, c.food?.kind));
         if (food) { e.ai.target = food; e.ai.roam = null; }
         else roam(state, e);
         break;

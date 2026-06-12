@@ -23,6 +23,7 @@ function playerDpsVs(genes, enemyCfg) {
   for (const g of genes) {
     const o = Offense[g];
     if (!o) continue;
+    if (o.secreted) continue; // toksin/bakteriocin virker som udskilte skyer (cloudSystem), ikke ved kontakt
     const applies =
       o.applies === 'all' ||
       (o.applies === 'bacteria' && enemyCfg.type === 'bacteria') ||

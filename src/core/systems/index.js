@@ -1,10 +1,12 @@
 // System-pipeline: rækkefølgen systemerne kører i hver tick. Se ARCHITECTURE.md §5.
+import { mutationSystem } from './mutationSystem.js';
 import { environmentSystem } from './environmentSystem.js';
 import { metabolismSystem } from './metabolismSystem.js';
 import { feedingSystem } from './feedingSystem.js';
 import { toleranceSystem } from './toleranceSystem.js';
 import { movementSystem } from './movementSystem.js';
 import { combatSystem } from './combatSystem.js';
+import { cloudSystem } from './cloudSystem.js';
 import { divisionSystem } from './divisionSystem.js';
 import { colonySystem } from './colonySystem.js';
 import { aiSystem } from './aiSystem.js';
@@ -13,6 +15,7 @@ import { hazardSystem } from './hazardSystem.js';
 import { lifecycleSystem } from './lifecycleSystem.js';
 
 export const pipeline = [
+  mutationSystem,    // 0. spillerens mutations-køb (gælder fra samme tick)
   environmentSystem, // 1. opdater felter (diffusion, gradienter)
   metabolismSystem,  // 2. ATP ind/ud, udskillelse til felter
   feedingSystem,     // 2b. æd mad-partikler i kontakt → ATP + byggesten
@@ -20,6 +23,7 @@ export const pipeline = [
   aiSystem,          // 4. fjende- + flok-beslutninger (sætter intents/mål)
   movementSystem,    // 5. bevægelse + bevægelsesomkostning
   combatSystem,      // 6. våben, opsluging, fag-spredning
+  cloudSystem,       // 6b. udskilte skyer (toksin/bakteriocin/maltase) + deres områdeeffekt
   colonySystem,      // 7. klynger, ressourcedeling, biofilm, quorum
   divisionSystem,    // 8. vækst, deling, mutation
   spawnSystem,       // 9. mad/fjender/farezoner efter pacing

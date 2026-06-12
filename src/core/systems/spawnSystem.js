@@ -6,8 +6,19 @@
 //   op til popCap. spawnInterval 0 = kun én gang. Fjender spawner mindst enemySafeRadius fra
 //   spilleren (fair varsel). Typer der kræver endnu ikke-byggede systemer (fag-infektion,
 //   rival-kolonier) spawner ikke endnu.
-import { World, Enemies } from '../../config/index.js';
+import { World, Enemies, Food } from '../../config/index.js';
 import { createFood, createEnemy } from '../entities.js';
+
+// Vægtet liste over mad-typer (alt i Food med en weight). Bruges til at vælge spawn-type.
+const FOOD_TYPES = Object.entries(Food).filter(([, v]) => v && v.weight > 0);
+const FOOD_WEIGHT_TOTAL = FOOD_TYPES.reduce((sum, [, v]) => sum + v.weight, 0);
+
+/** Vælg en mad-type efter vægt (glukose hyppigst, maltose sjældnest). */
+function pickFoodKind(rng) {
+  let r = rng() * FOOD_WEIGHT_TOTAL;
+  for (const [kind, v] of FOOD_TYPES) { r -= v.weight; if (r <= 0) return kind; }
+  return 'glucose';
+}
 
 /** Spawner denne fjendetype automatisk endnu? (fag + rival-koloni venter på egne systemer). */
 function autoSpawns(cfg) {
@@ -44,7 +55,11 @@ export function spawnSystem(state, dt) {
 
   s.foodAcc += World.foodPerSecond * dt;
   while (s.foodAcc >= 1 && foodCount < World.foodMax) {
-    createFood(state, { x: state.rng() * state.width, y: state.rng() * state.height });
+    createFood(state, {
+      x: state.rng() * state.width,
+      y: state.rng() * state.height,
+      kind: pickFoodKind(state.rng),
+    });
     s.foodAcc -= 1;
     foodCount++;
   }

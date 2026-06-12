@@ -1,5 +1,6 @@
 // Entitet-fabrik: samler komponenter til celler, mad, fager osv. Se ARCHITECTURE.md §4.
 import * as C from './components.js';
+import { Secretions, Food } from '../config/index.js';
 
 export function createEntity(state, components = {}) {
   const e = { id: state.nextId++, dead: false, ...components };
@@ -30,10 +31,32 @@ export function createCell(state, opts = {}) {
 
 export function createFood(state, opts = {}) {
   const { x = 0, y = 0, kind = 'glucose' } = opts;
+  const fk = Food[kind] ?? {};
+  const food = C.Food(kind);
+
+  // Substrater (maltose/peptid) er kæder: bestem længden (antal prikker = antal produkter).
+  let radius = 3;
+  if (fk.substrate) {
+    const n = fk.parts ?? (fk.partsMin + Math.floor(state.rng() * (fk.partsMax - fk.partsMin + 1)));
+    food.n = n;
+    radius = Math.min(8, 3 + n); // længere kæde = lidt bredere figur
+  }
+
   return createEntity(state, {
     kind: 'food',
-    transform: C.Transform(x, y, 3),
-    food: C.Food(kind),
+    transform: C.Transform(x, y, radius),
+    food,
+  });
+}
+
+export function createCloud(state, opts = {}) {
+  const { x = 0, y = 0, type = 'toxin' } = opts;
+  const cfg = Secretions[type] ?? {};
+  return createEntity(state, {
+    kind: 'cloud',
+    cloudType: type,
+    transform: C.Transform(x, y, cfg.radius ?? 80),
+    cloud: C.Cloud(type, cfg.life ?? 4),
   });
 }
 

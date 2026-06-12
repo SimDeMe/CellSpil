@@ -32,3 +32,6 @@ export const PlayerControlled = () => ({ player: true });
 export const Food = (kind = 'glucose') => ({ kind });
 
 export const Vesicles = () => ({ items: [], max: 5 });
+
+/** Udskilt sky (toksin/bakteriocin/maltase): type + levetid (sekunder). */
+export const Cloud = (type = 'toxin', life = 4) => ({ type, life, maxLife: life });
