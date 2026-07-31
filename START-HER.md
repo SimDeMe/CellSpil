@@ -10,11 +10,7 @@ instruktør: prøve spillet, sige hvad der føles rigtigt, og bede om ændringer
 I VS Code: **File → Open Folder…** og vælg mappen `CellSpil`. Nu kan Claude Code se alle
 filerne — både beskrivelserne og kode-fundamentet, vi har lavet.
 
-## 2. Start Claude Code og vælg Fable 5
-
-Åbn Claude Code i VS Code. Vælg modellen **Claude Fable 5** (den er bygget til lige præcis den
-slags lange byggeprojekter). Du behøver ikke gøre andet end at skrive til den, som du skriver
-til mig.
+## 2. Start Claude CodeDe
 
 ## 3. Indsæt denne første besked
 

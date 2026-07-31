@@ -21,7 +21,8 @@ export function lifecycleSystem(state, dt) {
     if (heir) {
       heir.control = controlLost.control; // spilleren styrer nu arvingen
       delete heir.ai;                     // den følger ikke længere en AI-politik
-      heir.moveTarget = undefined;        // start uden det gamle musemål
+      heir.moveTarget = undefined;        // start uden det gamle musemål ...
+      heir.moveDir = undefined;           // ... og uden en gammel piletast-retning
     }
   }
 

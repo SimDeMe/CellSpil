@@ -9,86 +9,218 @@
   <script src="https://pixijs.download/release/pixi.js"></script>
   <link rel="icon" href="data:,">
   <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1117;
-      font-family: -apple-system, system-ui, sans-serif; color: #e6edf3; }
-    #game-container { position: absolute; inset: 0; z-index: 0; }
-    .panel { background: rgba(13, 17, 23, 0.78); border: 1px solid #30363d; border-radius: 10px;
-      padding: 12px 14px; backdrop-filter: blur(4px); }
-    #hud { position: absolute; top: 12px; left: 12px; z-index: 10; width: 220px; }
-    #inspector { position: absolute; top: 12px; right: 12px; z-index: 10; width: 240px;
-      max-height: calc(100vh - 240px); overflow-y: auto; }
-    #inspector.hidden { display: none; }
-    #minimap-wrap { position: absolute; bottom: 12px; right: 12px; z-index: 10; padding: 8px; }
-    #minimap { display: block; border-radius: 6px; }
-    #toggleInspect { position: absolute; top: 12px; right: 12px; z-index: 11; display: none; }
-    #inspector.hidden ~ #toggleInspect { display: block; }
-    button { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px;
-      padding: 6px 10px; font-size: 12px; cursor: pointer; }
-    button:hover { border-color: #58a6ff; }
-    #closeInspect { float: right; padding: 2px 8px; margin: -4px -4px 0 0; }
-    #hint { position: absolute; bottom: 12px; left: 12px; z-index: 10; font-size: 12px;
-      color: #8b949e; background: rgba(13,17,23,0.6); padding: 6px 10px; border-radius: 8px; }
-
-    /* Stor delings-knap nederst midt på skærmen. */
-    #divideBtn { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
-      z-index: 12; padding: 13px 30px; font-size: 15px; font-weight: 700; border-radius: 12px;
-      border: 1px solid #30363d; background: rgba(33, 38, 45, 0.85); color: #8b949e;
-      cursor: default; opacity: 0.7; transition: opacity .15s, background .15s, color .15s, box-shadow .15s; }
-    #divideBtn.ready { color: #d7ffd9; background: rgba(76, 175, 80, 0.28); border-color: #4caf50;
-      cursor: pointer; opacity: 1; animation: dividePulse 1.4s ease-in-out infinite; }
-    #divideBtn.ready:hover { background: rgba(76, 175, 80, 0.42); }
-
-    /* Evne-bjælke (udskillelses-skyer) lige over delings-knappen. */
-    #abilityBar { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
-      z-index: 12; display: flex; gap: 8px; }
-    #abilityBar .ability { font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 10px;
-      background: rgba(33, 38, 45, 0.9); border-color: #455a64; }
-    #abilityBar .ability:hover:not(:disabled) { border-color: #80cbc4; }
-    @keyframes dividePulse {
-      0%, 100% { box-shadow: 0 0 12px rgba(76, 175, 80, 0.45); }
-      50%      { box-shadow: 0 0 24px rgba(76, 175, 80, 0.9); }
+    /* =========================================================================
+       LIQUID GLASS — ét sted at ændre "glasset". Alle paneler og knapper deler
+       de samme tokens herunder, så udseendet hænger sammen på tværs af spillet.
+       ========================================================================= */
+    :root {
+      /* Selve glasset: en svag lysning øverst til venstre (som lys på en buet flade)
+         oven på en næsten gennemsigtig hvid film. */
+      --glass-sheen: radial-gradient(130% 100% at 12% -25%, rgba(255,255,255,0.20), rgba(255,255,255,0) 58%);
+      --glass-film: linear-gradient(168deg, rgba(255,255,255,0.10), rgba(255,255,255,0.025) 46%, rgba(255,255,255,0.06));
+      --glass-tint: linear-gradient(168deg, rgba(13,17,23,0.42), rgba(13,17,23,0.62));
+      --glass-edge: rgba(255,255,255,0.16);
+      --glass-blur: blur(22px) saturate(190%);
+      /* Kanten foroven er lys (lyset rammer den), forneden mørk — det giver dybden. */
+      --glass-lip: inset 0 1px 0 rgba(255,255,255,0.26), inset 0 -1px 0 rgba(0,0,0,0.28);
+      --glass-lift: 0 10px 34px rgba(0,0,0,0.46), 0 2px 8px rgba(0,0,0,0.30);
+      --radius: 17px;
+      --ink: #e9eef5;
+      --ink-dim: #9aa7b6;
+      --accent: #58a6ff;
+      --ok: #4caf50;
+      --warn: #ffca28;
+      --bad: #f85149;
+      --ease: cubic-bezier(.22,.61,.36,1);
     }
 
-    /* Knaprække øverst midt: Pause + Inspect. */
-    #topbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 11; display: flex; gap: 8px; }
-    #pauseBtn.paused { border-color: #ffca28; color: #ffd54f; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14;
+      font-family: -apple-system, system-ui, sans-serif; color: var(--ink);
+      -webkit-font-smoothing: antialiased; }
+    #game-container { position: absolute; inset: 0; z-index: 0; }
+
+    /* Grundformen for alt glas. */
+    .glass, .panel, button {
+      /* Vigtigt: knapper har en lys standard-baggrund fra browseren — den skal slukkes,
+         ellers dækker den for glasset. */
+      background-color: transparent;
+      background-image: var(--glass-sheen), var(--glass-film), var(--glass-tint);
+      border: 1px solid var(--glass-edge);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      box-shadow: var(--glass-lip), var(--glass-lift);
+      color: var(--ink);
+    }
+    .panel { border-radius: var(--radius); padding: 13px 15px; }
+
+    /* Overskrift i et panel. */
+    .panel-title { font-weight: 700; font-size: 11px; letter-spacing: .12em;
+      color: var(--ink-dim); margin-bottom: 9px; text-transform: uppercase; }
+
+    #hud { position: absolute; top: 14px; left: 14px; z-index: 10; width: 224px; }
+    #inspector { position: absolute; top: 14px; right: 14px; z-index: 10; width: 246px;
+      max-height: calc(100vh - 250px); overflow-y: auto; }
+    #inspector.hidden { display: none; }
+    #minimap-wrap { position: absolute; bottom: 14px; right: 14px; z-index: 10; padding: 9px; }
+    #minimap { display: block; border-radius: 10px; opacity: .92; }
+    #toggleInspect { position: absolute; top: 14px; right: 14px; z-index: 11; display: none; }
+    #inspector.hidden ~ #toggleInspect { display: block; }
+
+    /* Knapper: samme glas, blødere hjørner, løfter sig en anelse når man peger. */
+    button { border-radius: 11px; padding: 7px 12px; font-size: 12px; cursor: pointer;
+      font-family: inherit; font-weight: 500;
+      transition: transform .16s var(--ease), border-color .16s var(--ease),
+                  box-shadow .16s var(--ease), filter .16s var(--ease); }
+    button:hover:not(:disabled) { border-color: rgba(255,255,255,0.30); filter: brightness(1.18);
+      transform: translateY(-1px);
+      box-shadow: var(--glass-lip), 0 14px 38px rgba(0,0,0,0.5); }
+    button:active:not(:disabled) { transform: translateY(0) scale(.985); filter: brightness(1.05); }
+    button:disabled { cursor: default; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    #closeInspect { float: right; padding: 2px 9px; margin: -5px -6px 0 0; border-radius: 9px; }
+
+    /* Rullepanel: tynd, diskret "glasstang" i stedet for browserens standard. */
+    #inspector, .modal-body { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
+    #inspector::-webkit-scrollbar, .modal-body::-webkit-scrollbar { width: 8px; }
+    #inspector::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.20); border-radius: 99px;
+      border: 2px solid transparent; background-clip: content-box; }
+    #inspector::-webkit-scrollbar-thumb:hover, .modal-body::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.34); background-clip: content-box; }
+
+    /* --- HUD: nøgletal og ressource-bjælker --- */
+    .hud-stat { display: flex; justify-content: space-between; font-size: 12px; margin: 5px 0; }
+    .hud-label { color: var(--ink-dim); }
+    .hud-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .hud-bar { margin: 8px 0; }
+    .hud-bar-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+    .hud-bar-value { font-size: 11px; color: #c6d0dc; font-variant-numeric: tabular-nums; }
+    .hud-track { height: 9px; border-radius: 99px; overflow: hidden;
+      background: rgba(0,0,0,0.34);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), inset 0 -1px 0 rgba(255,255,255,0.07); }
+    .hud-fill { height: 100%; width: 0%; border-radius: 99px;
+      background: var(--c);
+      background-image: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0) 62%);
+      box-shadow: 0 0 12px -1px var(--c);
+      transition: width .12s linear; }
+    .hud-status { margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
+
+    /* --- Evolution-panelet --- */
+    .evo-currency { font-size: 13px; margin-bottom: 2px; }
+    .evo-currency b { color: var(--accent); font-variant-numeric: tabular-nums; }
+    .evo-sub { font-size: 11px; color: var(--ink-dim); margin-bottom: 11px; }
+    .evo-branch { font-size: 12px; color: #c6d0dc; margin: 11px 0 5px; font-weight: 600; }
+    .evo-row { display: flex; justify-content: space-between; align-items: center; width: 100%;
+      padding: 7px 10px; margin: 4px 0; font-size: 12px; border-radius: 10px; }
+    .evo-name { text-align: left; }
+    .evo-status { font-size: 11px; white-space: nowrap; margin-left: 8px; color: #c6d0dc; }
+    /* Tilstande sættes af ui/inspector.js via data-state. */
+    .evo-row[data-state="active"] { border-color: rgba(76,175,80,0.75);
+      box-shadow: var(--glass-lip), 0 0 18px -4px rgba(76,175,80,0.75); }
+    .evo-row[data-state="active"] .evo-status { color: #8fdc93; }
+    .evo-row[data-state="switch"] { border-color: rgba(88,166,255,0.62); }
+    .evo-row[data-state="owned"] { opacity: .55; }
+    .evo-row[data-state="owned"] .evo-status { color: var(--ink-dim); }
+    .evo-row[data-state="locked"] { opacity: .42; }
+    .evo-row[data-state="locked"] .evo-status { color: var(--bad); }
+    /* Nederst til venstre: forklaring på madprikkerne + hjælpetekst, stablet i en søjle. */
+    #bottomleft { position: absolute; bottom: 14px; left: 14px; z-index: 10;
+      display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+    #hint { font-size: 12px; color: var(--ink-dim); padding: 7px 12px; border-radius: 11px;
+      background-image: var(--glass-film), var(--glass-tint);
+      border: 1px solid var(--glass-edge);
+      backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+
+    /* Forklaring (legende) over madtyperne — kun farve + navn. */
+    #legend { padding: 10px 13px; }
+    #legend.hidden { display: none; }
+    #legend .lg-head { font-size: 10px; color: var(--ink-dim); letter-spacing: .12em; margin-bottom: 7px; }
+    #legend .lg-row { display: flex; align-items: center; gap: 9px; margin: 4px 0; }
+    #legend .lg-dots { flex: 0 0 34px; display: flex; align-items: center; gap: 1px; }
+    /* Prikkerne får samme lille lysglimt som madkuglerne i spillet. */
+    #legend .lg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+      box-shadow: 0 0 7px -1px currentColor, inset 0 1px 0 rgba(255,255,255,0.55); }
+    #legend .lg-dot.sm { width: 6px; height: 6px; }
+    #legend .lg-name { font-size: 11.5px; }
+    #toggleLegend { padding: 5px 10px; font-size: 11px; }
+
+    /* Stor delings-knap nederst midt på skærmen. */
+    #divideBtn { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 12; padding: 14px 32px; font-size: 15px; font-weight: 700; border-radius: 16px;
+      color: var(--ink-dim); cursor: default; opacity: .72; }
+    #divideBtn:hover:not(.ready) { transform: translateX(-50%); filter: none; }
+    #divideBtn.ready { color: #dcffde; border-color: rgba(76,175,80,0.85); cursor: pointer; opacity: 1;
+      background-image: var(--glass-sheen), linear-gradient(168deg, rgba(76,175,80,0.34), rgba(76,175,80,0.16));
+      animation: dividePulse 1.6s ease-in-out infinite; }
+    #divideBtn.ready:hover { transform: translateX(-50%) translateY(-2px); }
+    @keyframes dividePulse {
+      0%, 100% { box-shadow: var(--glass-lip), 0 0 16px -2px rgba(76,175,80,0.55), var(--glass-lift); }
+      50%      { box-shadow: var(--glass-lip), 0 0 32px 2px rgba(76,175,80,0.85), var(--glass-lift); }
+    }
+
+    /* Evne-bjælke (udskillelses-skyer) lige over delings-knappen. */
+    #abilityBar { position: absolute; bottom: 78px; left: 50%; transform: translateX(-50%);
+      z-index: 12; display: flex; gap: 9px; }
+    #abilityBar .ability { font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 13px; }
+    #abilityBar .ability:hover:not(:disabled) { border-color: rgba(128,203,196,0.75); }
+    #abilityBar .ability:disabled { opacity: .42; }
+
+    /* Knaprække øverst midt: Pause · Inspect · styring. Én samlet glasplade med
+       "segmenter" indeni — knapperne selv er derfor gennemsigtige. */
+    #topbar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 11; display: flex; gap: 4px; padding: 4px; border-radius: 15px; }
+    #topbar button { background-image: none; border-color: transparent; box-shadow: none;
+      backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 11px; }
+    #topbar button:hover:not(:disabled) { background-image: var(--glass-film);
+      border-color: var(--glass-edge); box-shadow: none; }
+    #pauseBtn.paused { color: #ffd97a; border-color: rgba(255,202,40,0.6);
+      background-image: linear-gradient(168deg, rgba(255,202,40,0.22), rgba(255,202,40,0.08)); }
 
     /* Inspect-modal med faner. */
-    #inspectModal { position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
-      z-index: 20; width: 360px; display: flex; flex-direction: column; }
+    #inspectModal { position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
+      z-index: 20; width: 370px; display: flex; flex-direction: column; }
     #inspectModal.hidden { display: none; }
-    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .tabbar { display: flex; gap: 4px; margin: 6px 0; }
-    .tabbar button { flex: 1; font-size: 11px; padding: 5px 4px; }
-    .tabbar button.active { border-color: #58a6ff; color: #fff; background: #1f2d3d; }
-    .modal-body { max-height: calc(100vh - 200px); overflow-y: auto; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .modal-head .panel-title { margin-bottom: 0; }
+    .tabbar { display: flex; gap: 4px; margin: 8px 0; padding: 4px; border-radius: 13px;
+      background: rgba(0,0,0,0.26); box-shadow: inset 0 1px 3px rgba(0,0,0,0.45); }
+    .tabbar button { flex: 1; font-size: 11px; padding: 6px 4px; border-radius: 9px;
+      background-image: none; border-color: transparent; box-shadow: none;
+      backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .tabbar button:hover:not(.active) { background-image: var(--glass-film); box-shadow: none; }
+    .tabbar button.active { color: #fff; border-color: var(--glass-edge);
+      background-image: var(--glass-sheen), var(--glass-film);
+      box-shadow: var(--glass-lip); transform: none; }
+    .modal-body { max-height: calc(100vh - 210px); overflow-y: auto; }
     .tabpane { display: none; }
     .tabpane.active { display: block; }
-    #inspectModal .ih { font-size: 11px; color: #8b949e; text-transform: uppercase;
-      letter-spacing: .06em; margin: 12px 0 4px; }
-    #inspectModal .muted { color: #6e7681; font-size: 12px; }
+    #inspectModal .ih { font-size: 11px; color: var(--ink-dim); text-transform: uppercase;
+      letter-spacing: .1em; margin: 14px 0 5px; }
+    #inspectModal .muted { color: #7c8794; font-size: 12px; }
     #inspectModal .mrow { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; gap: 10px; }
-    #inspectModal .sub { font-size: 10px; color: #6e7681; margin: 1px 0 4px; text-align: right; }
-    #inspectModal .mut { border: 1px solid #30363d; border-radius: 7px; padding: 7px 9px; margin: 4px 0; }
+    #inspectModal .sub { font-size: 10px; color: #7c8794; margin: 1px 0 4px; text-align: right; }
+    #inspectModal .mut { border: 1px solid var(--glass-edge); border-radius: 11px; padding: 8px 11px;
+      margin: 5px 0; background-image: var(--glass-film); }
     #inspectModal .mut .t { font-weight: 600; font-size: 12px; }
-    #inspectModal .mut .d { font-size: 11px; color: #8b949e; margin-top: 2px; }
-    .blank { color: #6e7681; font-size: 12px; font-style: italic; padding: 22px 4px; text-align: center; }
+    #inspectModal .mut .d { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+    .blank { color: #7c8794; font-size: 12px; font-style: italic; padding: 26px 4px; text-align: center; }
   </style>
 </head>
 
 <body>
   <div id="game-container"></div>
 
-  <div id="topbar">
+  <div id="topbar" class="glass">
     <button id="pauseBtn">⏸ Pause</button>
     <button id="inspectBtn">🔍 Inspect</button>
+    <button id="controlBtn" title="Skift styring (M)">🖱️ Mus</button>
   </div>
 
   <div id="inspectModal" class="panel hidden">
     <div class="modal-head">
-      <div style="font-weight:700;font-size:13px;letter-spacing:.08em;color:#8b949e;">INSPECT — inde i cellen</div>
-      <button id="closeInspectModal" style="padding:2px 8px;">✕</button>
+      <div class="panel-title">Inspect — inde i cellen</div>
+      <button id="closeInspectModal" style="padding:2px 9px;">✕</button>
     </div>
     <div class="tabbar">
       <button class="active" data-tab="tabMutations">🧬 Mutationer</button>
@@ -116,7 +248,13 @@
     <canvas id="minimap" width="180" height="180"></canvas>
   </div>
 
-  <div id="hint">Bevæg musen — din celle svømmer derhen. (Ny version, src/)</div>
+  <div id="bottomleft">
+    <div id="legend" class="panel"></div>
+    <div style="display: flex; gap: 6px; align-items: center;">
+      <button id="toggleLegend" title="Vis/skjul forklaringen">🧪</button>
+      <div id="hint">Bevæg musen — din celle svømmer derhen.</div>
+    </div>
+  </div>
 
   <div id="abilityBar"></div>
 
@@ -142,6 +280,14 @@
     document.getElementById('closeInspect').addEventListener('click', () => inspector.classList.add('hidden'));
     document.getElementById('toggleInspect').addEventListener('click', () => inspector.classList.remove('hidden'));
 
+    // Forklaringen nederst til venstre: vis/skjul (valget huskes).
+    const legend = document.getElementById('legend');
+    if (localStorage.getItem('cellspil.legendHidden') === '1') legend.classList.add('hidden');
+    document.getElementById('toggleLegend').addEventListener('click', () => {
+      const hidden = legend.classList.toggle('hidden');
+      localStorage.setItem('cellspil.legendHidden', hidden ? '1' : '0');
+    });
+
     // Inspect-modal: åbn/luk + faneskift.
     const inspectModal = document.getElementById('inspectModal');
     document.getElementById('inspectBtn').addEventListener('click', () => inspectModal.classList.toggle('hidden'));
@@ -164,6 +310,9 @@
       divideButton: document.getElementById('divideBtn'),
       abilityBar: document.getElementById('abilityBar'),
       pauseButton: document.getElementById('pauseBtn'),
+      controlButton: document.getElementById('controlBtn'),
+      hintText: document.getElementById('hint'),
+      legendRoot: document.getElementById('legend'),
       inspect: {
         modal: inspectModal,
         mutations: document.getElementById('tabMutationsBody'),

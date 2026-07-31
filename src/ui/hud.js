@@ -10,8 +10,9 @@ export function createHud(root /* HTMLElement */) {
   root.innerHTML = '';
   const rows = {};
 
-  const title = el('div', { textContent: 'CELLE', style: 'font-weight:700;font-size:13px;letter-spacing:.08em;color:#8b949e;margin-bottom:8px;' });
-  root.appendChild(title);
+  // Udseendet ligger i CSS (se index.html) — her sættes kun klasser, så glas-stilen kan
+  // ændres ét sted uden at røre spil-koden.
+  root.appendChild(el('div', { textContent: 'CELLE', className: 'panel-title' }));
 
   rows.gen = stat(root, 'Generation', '0');
   rows.atp = bar(root, 'ATP', '#ffca28');
@@ -20,7 +21,7 @@ export function createHud(root /* HTMLElement */) {
   rows.comfort = bar(root, 'Komfort', '#26c6da');
   rows.pop = stat(root, 'Population', '0');
   rows.time = stat(root, 'Tid', '0s');
-  rows.status = el('div', { style: 'margin-top:8px;font-size:12px;color:#8b949e;' });
+  rows.status = el('div', { className: 'hud-status' });
   root.appendChild(rows.status);
 
   return {
@@ -54,29 +55,31 @@ export function createHud(root /* HTMLElement */) {
 // --- små DOM-hjælpere ---
 function el(tag, props = {}) {
   const e = document.createElement(tag);
+  if (props.className) e.className = props.className;
   if (props.style) e.setAttribute('style', props.style);
   if (props.textContent != null) e.textContent = props.textContent;
   return e;
 }
 
 function stat(root, label, initial) {
-  const wrap = el('div', { style: 'display:flex;justify-content:space-between;font-size:12px;margin:4px 0;' });
-  wrap.appendChild(el('span', { textContent: label, style: 'color:#8b949e;' }));
-  const value = el('span', { textContent: initial, style: 'font-weight:600;' });
+  const wrap = el('div', { className: 'hud-stat' });
+  wrap.appendChild(el('span', { textContent: label, className: 'hud-label' }));
+  const value = el('span', { textContent: initial, className: 'hud-value' });
   wrap.appendChild(value);
   root.appendChild(wrap);
   return { value };
 }
 
 function bar(root, label, color) {
-  const wrap = el('div', { style: 'margin:6px 0;' });
-  const head = el('div', { style: 'display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;' });
-  head.appendChild(el('span', { textContent: label, style: 'color:#8b949e;' }));
-  const value = el('span', { textContent: '', style: 'font-size:11px;color:#c9d1d9;' });
+  const wrap = el('div', { className: 'hud-bar' });
+  wrap.style.setProperty('--c', color); // bjælkens farve → CSS klarer selve udseendet
+  const head = el('div', { className: 'hud-bar-head' });
+  head.appendChild(el('span', { textContent: label, className: 'hud-label' }));
+  const value = el('span', { textContent: '', className: 'hud-bar-value' });
   head.appendChild(value);
   wrap.appendChild(head);
-  const track = el('div', { style: 'height:8px;background:#21262d;border-radius:5px;overflow:hidden;' });
-  const fill = el('div', { style: `height:100%;width:0%;background:${color};border-radius:5px;transition:width .1s linear;` });
+  const track = el('div', { className: 'hud-track' });
+  const fill = el('div', { className: 'hud-fill' });
   track.appendChild(fill);
   wrap.appendChild(track);
   root.appendChild(wrap);

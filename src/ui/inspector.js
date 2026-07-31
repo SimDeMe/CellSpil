@@ -14,24 +14,25 @@ const META = {
 export function createInspector(root /* HTMLElement */, emitIntent) {
   root.innerHTML = '';
 
-  root.appendChild(el('div', { textContent: 'EVOLUTION', style: 'font-weight:700;font-size:13px;letter-spacing:.08em;color:#8b949e;margin-bottom:6px;' }));
+  // Udseendet ligger i CSS (se index.html) — her sættes kun klasser og tilstand.
+  root.appendChild(el('div', { textContent: 'EVOLUTION', className: 'panel-title' }));
 
   // Valuta + nøgletal.
-  const nucleo = el('div', { style: 'font-size:13px;margin-bottom:2px;' });
+  const nucleo = el('div', { className: 'evo-currency' });
   root.appendChild(nucleo);
-  const sub = el('div', { style: 'font-size:11px;color:#8b949e;margin-bottom:10px;' });
+  const sub = el('div', { className: 'evo-sub' });
   root.appendChild(sub);
 
   // Byg de tre grene; gem rækkerne, så de kan opdateres hver frame.
   const rows = [];
   for (const branch of ['motility', 'metabolism', 'tool']) {
-    root.appendChild(el('div', { textContent: META[branch].title, style: 'font-size:12px;color:#c9d1d9;margin:8px 0 4px;font-weight:600;' }));
+    root.appendChild(el('div', { textContent: META[branch].title, className: 'evo-branch' }));
     for (const id of Evolution.branches[branch]) {
       const btn = document.createElement('button');
-      btn.setAttribute('style', rowStyle());
+      btn.className = 'evo-row';
       btn.title = Evolution.blurb[id] ?? '';
-      const name = el('span', { textContent: META[branch].src[id]?.label ?? id, style: 'text-align:left;' });
-      const status = el('span', { textContent: '', style: 'font-size:11px;white-space:nowrap;margin-left:8px;' });
+      const name = el('span', { textContent: META[branch].src[id]?.label ?? id, className: 'evo-name' });
+      const status = el('span', { textContent: '', className: 'evo-status' });
       btn.append(name, status);
       btn.addEventListener('click', () => emitIntent({ type: 'buy-mutation', id }));
       root.appendChild(btn);
@@ -45,11 +46,11 @@ export function createInspector(root /* HTMLElement */, emitIntent) {
       if (!p) {
         nucleo.textContent = 'Ingen celle i live';
         sub.textContent = '';
-        for (const r of rows) { r.btn.disabled = true; r.btn.style.opacity = '0.4'; }
+        for (const r of rows) { r.btn.disabled = true; r.btn.dataset.state = 'locked'; }
         return;
       }
       const n = p.resources?.nucleotide ?? 0;
-      nucleo.innerHTML = `Nukleotider: <b style="color:#42a5f5">${n.toFixed(1)}</b>`;
+      nucleo.innerHTML = `Nukleotider: <b>${n.toFixed(1)}</b>`;
       sub.textContent = `Generation ${p.lineage?.generation ?? 0} · ${p.lineage?.mutations ?? 0} mutationer`;
 
       for (const r of rows) {
@@ -62,38 +63,32 @@ export function createInspector(root /* HTMLElement */, emitIntent) {
   };
 }
 
+// Sætter rækkens TILSTAND (data-state) + statustekst. Farver/glas ligger i CSS.
+//   active = den aktive metabolisme/motorik · owned = værktøj man ejer · switch = oplåst, kan
+//   aktiveres gratis · buy = har råd · locked = for få nukleotider.
 function styleRow(r, { owned, active, price, nucleotide, branch }) {
   const isTool = branch === 'tool';
-  let border = '#30363d', bg = '#161b22', txt = '', opacity = '1', disabled = false;
+  let state, txt, disabled = false;
 
   if (active) {
-    border = '#4caf50'; bg = 'rgba(76,175,80,0.15)'; txt = '● Aktiv';
+    state = 'active'; txt = '● Aktiv';
   } else if (owned) {
-    if (isTool) { border = '#30363d'; txt = '✓ Ejet'; opacity = '0.7'; disabled = true; }
-    else { border = '#58a6ff'; txt = 'Skift'; } // oplåst skift-gren: gratis at aktivere
+    if (isTool) { state = 'owned'; txt = '✓ Ejet'; disabled = true; }
+    else { state = 'switch'; txt = 'Skift'; } // oplåst skift-gren: gratis at aktivere
+  } else if (nucleotide < price) {
+    state = 'locked'; txt = `🧬 ${price}`; disabled = true;
   } else {
-    txt = `🧬 ${price}`;
-    if (nucleotide < price) { opacity = '0.45'; disabled = true; }
+    state = 'buy'; txt = `🧬 ${price}`;
   }
 
-  r.btn.style.borderColor = border;
-  r.btn.style.background = bg;
-  r.btn.style.opacity = opacity;
+  r.btn.dataset.state = state;
   r.btn.disabled = disabled;
-  r.btn.style.cursor = disabled ? 'default' : 'pointer';
   r.status.textContent = txt;
-  r.status.style.color = active ? '#81c784' : owned && isTool ? '#8b949e' : nucleotide < price && !owned ? '#f85149' : '#c9d1d9';
-}
-
-function rowStyle() {
-  return 'display:flex;justify-content:space-between;align-items:center;width:100%;' +
-    'background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:7px;' +
-    'padding:6px 9px;margin:3px 0;font-size:12px;cursor:pointer;';
 }
 
 function el(tag, props = {}) {
   const e = document.createElement(tag);
-  if (props.style) e.setAttribute('style', props.style);
+  if (props.className) e.className = props.className;
   if (props.textContent != null) e.textContent = props.textContent;
   return e;
 }

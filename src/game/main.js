@@ -10,6 +10,7 @@ import { createInspector } from '../ui/inspector.js';
 import { createDivideButton } from '../ui/divideButton.js';
 import { createCellInspect } from '../ui/cellInspect.js';
 import { createAbilityBar } from '../ui/abilityBar.js';
+import { createLegend } from '../ui/legend.js';
 
 const STEP = 1 / 60; // fast simulationsskridt (sekunder)
 
@@ -28,6 +29,42 @@ export async function startGame(deps = {}) {
   const divideButton = deps.divideButton ? createDivideButton(deps.divideButton, input.emit) : null;
   const cellInspect = deps.inspect ? createCellInspect(deps.inspect) : null;
   const abilityBar = deps.abilityBar ? createAbilityBar(deps.abilityBar, input.emit) : null;
+  // Forklaringen på madprikkerne er statisk (bygges én gang, opdateres ikke hver frame).
+  createLegend(deps.legendRoot);
+
+  // --- Styring: mus eller piletaster. Spilleren vælger selv med knappen i topbaren (eller M).
+  // Valget huskes i browseren, så det er det samme næste gang spillet åbnes.
+  const win = deps.window || globalThis;
+  const store = win.localStorage || null;
+  const CONTROL_KEY = 'cellspil.controlMode';
+  const controlBtn = deps.controlButton || null;
+
+  function showControlMode() {
+    if (controlBtn) {
+      controlBtn.textContent = input.mode === 'keys' ? '⌨️ Piletaster' : '🖱️ Mus';
+      controlBtn.title = input.mode === 'keys'
+        ? 'Styring: piletaster (klik for at skifte til mus)'
+        : 'Styring: musen (klik for at skifte til piletaster)';
+    }
+    if (deps.hintText) {
+      deps.hintText.textContent = input.mode === 'keys'
+        ? 'Hold piletasterne nede — din celle svømmer den vej.'
+        : 'Bevæg musen — din celle svømmer derhen.';
+    }
+  }
+
+  function setControlMode(mode) {
+    input.setMode(mode);
+    try { store?.setItem(CONTROL_KEY, input.mode); } catch { /* privat browsing: bare drop det */ }
+    showControlMode();
+  }
+
+  let savedMode = null;
+  try { savedMode = store?.getItem(CONTROL_KEY); } catch { /* ingen adgang til localStorage */ }
+  setControlMode(savedMode || 'mouse');
+
+  const toggleControlMode = () => setControlMode(input.mode === 'keys' ? 'mouse' : 'keys');
+  if (controlBtn) controlBtn.addEventListener('click', toggleControlMode);
 
   // Pause: stopper KUN simulationen — rendering + paneler (fx Inspect) kører videre, så man
   // kan studere cellen i ro. Knap + mellemrumstast slår pause til/fra.
@@ -41,8 +78,9 @@ export async function startGame(deps = {}) {
     }
   }
   if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
-  (deps.window || globalThis).addEventListener('keydown', (ev) => {
+  win.addEventListener('keydown', (ev) => {
     if (ev.code === 'Space') { ev.preventDefault(); togglePause(); }
+    else if (ev.key === 'm' || ev.key === 'M') toggleControlMode();
   });
 
   // Fast-tidsskridt-løkke med akkumulator (afkobler sim fra framerate).
@@ -56,8 +94,12 @@ export async function startGame(deps = {}) {
     if (!paused) {
       acc += elapsed;
 
-      // Musens skærm-position → verdens-koordinat via kameraet → 'move-to'-intent.
-      if (renderer && input.mouse.seen) {
+      if (input.mode === 'keys') {
+        // Piletaster: send den retning, der holdes nede (0,0 = slip → cellen stopper).
+        const d = input.direction();
+        input.emit({ type: 'move-dir', dx: d.dx, dy: d.dy });
+      } else if (renderer && input.mouse.seen) {
+        // Mus: skærm-position → verdens-koordinat via kameraet → 'move-to'-intent.
         const w = renderer.screenToWorld(input.mouse.x, input.mouse.y);
         input.emit({ type: 'move-to', x: w.x, y: w.y });
       }
