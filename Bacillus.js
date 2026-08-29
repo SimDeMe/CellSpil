@@ -88,6 +88,9 @@ export class Bacillus extends Cell {
         // Basal stofskifte (lavere end Cell)
         this.atp -= GameConfig.Bacillus.passiveDecay;
 
+        // [FIX] Omdan opsamlet glucose (carbon) til ATP
+        this.metabolize();
+
         if (this.atp <= 0) {
             this.alive = false;
         }
@@ -302,9 +305,17 @@ export class Bacillus extends Cell {
 
                         // Gain Resources
                         // Values from GameConfig
-                        if (nearest.type === 'glucose') this.atp += GameConfig.Resources.glucoseEnergy;
-                        if (nearest.type === 'amino') this.aminoAcids += GameConfig.Resources.aminoValue;
-                        if (nearest.type === 'nucleotide') this.nucleotides = (this.nucleotides || 0) + 1;
+                        // [FIX] Handle new resource types (Carbon/Nitrogen/Phosphate)
+                        if (nearest.type === 'carbon' || nearest.type === 'glucose') {
+                            this.glucose += GameConfig.Resources.carbonValue;
+                        }
+                        else if (nearest.type === 'nitrogen' || nearest.type === 'amino') {
+                            // NPC Shortcut: Direct amino gain to ensure reproduction
+                            this.aminoAcids += GameConfig.Resources.nitrogenValue;
+                        }
+                        else if (nearest.type === 'phosphate' || nearest.type === 'nucleotide') {
+                            this.nucleotides = (this.nucleotides || 0) + 1;
+                        }
 
                         this.atp = Math.min(this.atp, this.maxAtp);
                         this.aminoAcids = Math.min(this.aminoAcids, this.maxAminoAcids);
@@ -352,7 +363,12 @@ export class Bacillus extends Cell {
         }
 
         // Reprodution (Megabacillus)
-        if (this.isMegabacillus && this.aminoAcids >= this.maxAminoAcids) {
+        if (this.isMegabacillus) {
+            const cost = GameConfig.Megabacillus.divisionCost;
+            if (this.glucose >= cost.glucose && 
+                this.aminoAcids >= cost.amino && 
+                (this.nucleotides || 0) >= cost.nucleotide) {
+
             // Check count cap (Prevent infinite growth)
             const megaCount = otherCells.filter(c => c.isMegabacillus && c.alive).length;
             if (megaCount < 10) { // Hard cap på 10 mega
@@ -361,8 +377,13 @@ export class Bacillus extends Cell {
                 const by = this.y + 40;
                 const child = new Bacillus(bx, by, true); // True = Mega
                 otherCells.push(child);
-                this.aminoAcids = 0;
+                
+                // Betal prisen
+                this.glucose -= cost.glucose;
+                this.aminoAcids -= cost.amino;
+                this.nucleotides -= cost.nucleotide;
                 console.log("Megabacillus divided!");
+            }
             }
         }
     }

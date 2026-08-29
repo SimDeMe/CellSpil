@@ -59,13 +59,15 @@ export const GameConfig = {
         passiveDecay: 0.01,
         populationCap: 50,
         initialSpawnTime: 60, // Seconds (1 minute)
-        spawnInterval: 60 // Seconds (1 per minute)
+        spawnInterval: 60, // Seconds (1 per minute)
+        divisionCost: { glucose: 30, amino: 10, nucleotide: 10 } // [NEW] Krav for deling
     },
     Megabacillus: {
         spawnTime: 30000, // 30 sekunder (DEBUG TEST TID, ellers 300000 = 5 min)
         count: 2,
         speedFactor: 1.0, // [UPDATED] Same speed as regular
         color: '#D32F2F', // Deep Red
+        divisionCost: { glucose: 100, amino: 40, nucleotide: 40 }, // [NEW] Krav for Mega deling
         stats: {
             radius: 30, // Lidt større end max (28)
             maxAtp: 200,
